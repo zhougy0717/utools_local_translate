@@ -1,0 +1,21 @@
+{
+  "preload": "preload.js",
+  "logo": "translate.png",
+  "features": [
+    {
+      "code": "dict",
+      "explain": "本地词典查词（Demo）",
+      "icon": "translate.png",
+      "cmds": [
+        "dict",
+        "查词",
+        {
+          "type": "over",
+          "label": "查词",
+          "minLength": 1,
+          "maxLength": 200
+        }
+      ]
+    }
+  ]
+}

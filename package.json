@@ -1,0 +1,13 @@
+{
+  "name": "本地翻译",
+  "version": "0.1.0",
+  "description": "uTools 本地词典查词插件",
+  "type": "commonjs",
+  "private": true,
+  "scripts": {
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "sql.js": "^1.10.0"
+  }
+}
