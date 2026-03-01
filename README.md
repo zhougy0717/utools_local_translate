@@ -1,39 +1,54 @@
-# utools_local_translate
+# 本地词典 / 中英翻译（uTools 插件）
 
-#### 介绍
-{**以下是 Gitee 平台说明，您可以替换此简介**
-Gitee 是 OSCHINA 推出的基于 Git 的代码托管平台（同时支持 SVN）。专为开发者提供稳定、高效、安全的云端软件开发协作平台
-无论是个人、团队、或是企业，都能够用 Gitee 实现代码托管、项目管理、协作开发。企业项目请看 [https://gitee.com/enterprises](https://gitee.com/enterprises)}
+uTools 列表模式插件：输入单词或中文，自动识别语言并查词（英→中 / 中→英）。
 
-#### 软件架构
-软件架构说明
+## 功能
 
+- **英→中**：输入英文单词，查询 ecdict 词库，展示释义与音标。
+- **中→英**：输入中文（或含中文），查询 CC-CEDICT 词库，展示英文释义与拼音。
+- 输入框会根据是否包含中文自动选择查词方向，无需手动切换。
 
-#### 安装教程
+## 词库（双 SQLite 数据库，支持压缩发布）
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+- **英→中**：`resources/ecdict.db`（表 `stardict`）；**中→英**：`resources/cccedict.db`（表 `cccedict`）。
+- 发布包可仅包含 **ecdict.db.gz**、**cccedict.db.gz** 以减小体积。用户**首次使用**某方向查词时，插件会自动解压对应 .gz 为 .db 并删除 .gz，之后直接使用 .db，无需再次解压。
 
-#### 使用说明
+## 维护者：构建词库与压缩包
 
-1.  xxxx
-2.  xxxx
-3.  xxxx
+### 生成 cccedict.db
 
-#### 参与贡献
+中→英词库由 CC-CEDICT 数据生成。维护者发布新版本前，可运行项目内 Python 脚本从网络下载 CC-CEDICT 并生成 `resources/cccedict.db`，与 ecdict.db 一并打包发布。
 
-1.  Fork 本仓库
-2.  新建 Feat_xxx 分支
-3.  提交代码
-4.  新建 Pull Request
+**运行方式（在项目根目录）：**
 
+```bash
+python3 scripts/build_cccedict.py
+```
 
-#### 特技
+- 默认从 MDBG 官方下载 CC-CEDICT（UTF-8 GZip），解析并写入 `resources/cccedict.db`。
+- 可选参数：
+  - `--output <路径>`：指定输出 SQLite 文件路径（默认 `resources/cccedict.db`）。
+  - `--url <URL>`：指定下载地址（默认 MDBG 官方链接）。
 
-1.  使用 Readme\_XXX.md 来支持不同的语言，例如 Readme\_en.md, Readme\_zh.md
-2.  Gitee 官方博客 [blog.gitee.com](https://blog.gitee.com)
-3.  你可以 [https://gitee.com/explore](https://gitee.com/explore) 这个地址来了解 Gitee 上的优秀开源项目
-4.  [GVP](https://gitee.com/gvp) 全称是 Gitee 最有价值开源项目，是综合评定出的优秀开源项目
-5.  Gitee 官方提供的使用手册 [https://gitee.com/help](https://gitee.com/help)
-6.  Gitee 封面人物是一档用来展示 Gitee 会员风采的栏目 [https://gitee.com/gitee-stars/](https://gitee.com/gitee-stars/)
+详见 `scripts/build_cccedict.py` 内注释。
+
+### 压缩为 .gz（减小发布体积）
+
+打包前可将两个 .db 压缩为 .gz，发布包内只带 .gz，用户首次使用时自动解压：
+
+```bash
+python3 scripts/zip_dicts.py
+```
+
+- 默认读取并输出到 `resources/`，生成 `ecdict.db.gz`、`cccedict.db.gz`。
+- 可选：`--input <目录>`、`--output <目录>`。详见 `scripts/zip_dicts.py` 内注释。
+
+## 打包发布
+
+- 若使用压缩发布：发布前运行 `python3 scripts/zip_dicts.py`，将 `resources/` 下的 **ecdict.db.gz**、**cccedict.db.gz** 随插件打包即可；用户首次查词时自动解压并删除 .gz。
+- 若不压缩：发布前确认 `resources/` 下存在 `ecdict.db` 与 `cccedict.db`，随插件一起打包。
+
+## 开发与测试
+
+- 单元测试：`node --test test/isLikelyChinese.test.js test/ecdict.test.js`
+- 设计文档：见 `doc/spec/spec-00001-ecdict.md`、`doc/spec/spec-00002-chinese-to-english.md`、`doc/spec/spec-00003-zipped-dict.md`。
