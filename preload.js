@@ -8,6 +8,11 @@ const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
 
 const currentBackendId = 'helsinki'; // 默认选择 Helsinki 模型
 
+// 后续用于持久化配置：控制是否展示查询时延列表项
+const GLOBAL_CONFIG = {
+  showTranslationCost: true
+};
+
 const backend = currentBackendId === 'helsinki'
   ? createHelsinkiBackend()
   : createEcdictBackend();
@@ -25,26 +30,45 @@ function isLikelyChinese(text) {
  * @param {{ found: boolean, translation?: string, phonetic?: string, message?: string }} result - 后端返回
  * @param {boolean} [isZhToEn] - 是否为中→英结果（用于多释义拆条、拼音小字显示）
  */
-function buildListItems(searchWord, result, isZhToEn) {
+function buildListItems(searchWord, result, isZhToEn, costTime) {
+  let list = [];
+
   if (result.message) {
-    return [{ title: '词库未就绪', description: result.message }];
+    list.push({ title: '词库未就绪', description: result.message });
+  } else if (!result.found || !result.translation) {
+    list.push({ title: '未找到释义', description: searchWord });
+  } else {
+    // 中→英：拼音放 description（小字），同一中文的多个英文释义拆成多条列表项
+    if (isZhToEn) {
+      const pinyinPart = result.phonetic ? result.phonetic + ' · ' : '';
+      const desc = pinyinPart + searchWord;
+      const parts = result.translation.split(/\s*;\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
+
+      if (parts.length === 0) {
+        list.push({ title: '（无释义）', description: searchWord });
+      } else {
+        parts.forEach(function (en) {
+          list.push({ title: en, description: desc });
+        });
+      }
+    } else {
+      // 英→中：title 为音标+释义，description 为被查词
+      const translationText = [result.phonetic, result.translation].filter(Boolean).join(' ') || '（无释义）';
+      list.push({ title: translationText, description: searchWord });
+    }
   }
-  if (!result.found || !result.translation) {
-    return [{ title: '未找到释义', description: searchWord }];
-  }
-  // 中→英：拼音放 description（小字），同一中文的多个英文释义拆成多条列表项
-  if (isZhToEn) {
-    const pinyinPart = result.phonetic ? result.phonetic + ' · ' : '';
-    const desc = pinyinPart + searchWord;
-    const parts = result.translation.split(/\s*;\s*/).map(function (s) { return s.trim(); }).filter(Boolean);
-    if (parts.length === 0) return [{ title: '（无释义）', description: searchWord }];
-    return parts.map(function (en) {
-      return { title: en, description: desc };
+
+  // 独立追加时延统计项 (根据配置开关决定是否显示)去除了原本拼接到原本字符串中的功能
+  if (costTime && GLOBAL_CONFIG.showTranslationCost) {
+    const costSeconds = (costTime / 1000).toFixed(2);
+    list.push({
+      title: '⚡ 本地翻译耗时: ' + costSeconds + '秒',
+      description: '大模型推理时间分析',
+      icon: ''
     });
   }
-  // 英→中：title 为音标+释义，description 为被查词
-  const translationText = [result.phonetic, result.translation].filter(Boolean).join(' ') || '（无释义）';
-  return [{ title: translationText, description: searchWord }];
+
+  return list;
 }
 
 /** 使用 uTools 官方 API 读取剪贴板文本（与 getCopyedFiles 同系列） */
@@ -61,11 +85,25 @@ function applyEnterWithWord(word, callbackSetList) {
   const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
   const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
   const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
-  backend.queryWord(w, sourceLang, targetLang, function (err, result) {
-    callbackSetList(buildListItems(w, result || { found: false }, isZhToEn));
-  });
+
+  callbackSetList([
+    { title: '⏳ 正在翻译中...', description: '调用本地大模型，可能需要数秒钟，请稍候...' }
+  ]);
+
+  // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的“请稍候”列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+  setTimeout(() => {
+    const startTime = Date.now();
+    backend.queryWord(w, sourceLang, targetLang, function (err, result) {
+      const costMs = Date.now() - startTime;
+      callbackSetList(buildListItems(w, result || { found: false }, isZhToEn, costMs));
+    });
+  }, 50);
+
   return true;
 }
+
+let searchTimeout = null;
+const DEBOUNCE_DELAY = 600;
 
 if (typeof window !== 'undefined') {
   window.exports = {
@@ -89,19 +127,42 @@ if (typeof window !== 'undefined') {
           ]);
         },
         search: function (action, searchWord, callbackSetList) {
+          if (searchTimeout) {
+            clearTimeout(searchTimeout);
+            searchTimeout = null;
+          }
+
           if (!searchWord || !searchWord.trim()) {
             callbackSetList([]);
             return;
           }
           const w = searchWord.trim();
-          const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
-          const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-          const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
-          backend.queryWord(w, sourceLang, targetLang, function (err, result) {
-            callbackSetList(buildListItems(w, result || { found: false }, isZhToEn));
-          });
+
+          searchTimeout = setTimeout(() => {
+            callbackSetList([
+              { title: '⏳ 正在翻译中...', description: '调用本地大模型，可能需要数秒钟，请稍候...' }
+            ]);
+
+            const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
+            const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
+            const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+
+            // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的“请稍候”列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+            setTimeout(() => {
+              const startTime = Date.now();
+              backend.queryWord(w, sourceLang, targetLang, function (err, result) {
+                const costMs = Date.now() - startTime;
+                callbackSetList(buildListItems(w, result || { found: false }, isZhToEn, costMs));
+              });
+            }, 50);
+          }, DEBOUNCE_DELAY);
         },
         select: function (action, itemData, callbackSetList) {
+          // 如果用户点击的是耗时统计条目，不进行任何动作
+          if (itemData.title && itemData.title.startsWith('⚡ 本地翻译耗时')) {
+            return;
+          }
+
           let textToCopy = itemData.title;
           if (itemData.title === '词库未就绪' || itemData.title === '未找到释义' || itemData.title === '欢迎使用本地词典') {
             textToCopy = itemData.description;
