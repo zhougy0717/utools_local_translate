@@ -4,8 +4,13 @@
  * 支持：用户先 Ctrl+C 复制选中文字，再打开插件时自动读取剪贴板并查词。
  */
 const { createEcdictBackend } = require('./backends/ecdict.js');
+const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
 
-const backend = createEcdictBackend();
+const currentBackendId = 'helsinki'; // 默认选择 Helsinki 模型
+
+const backend = currentBackendId === 'helsinki'
+  ? createHelsinkiBackend()
+  : createEcdictBackend();
 
 const MAX_SELECTION_LENGTH = 200;
 
@@ -65,50 +70,50 @@ function applyEnterWithWord(word, callbackSetList) {
 if (typeof window !== 'undefined') {
   window.exports = {
     dict: {
-    mode: 'list',
-    args: {
-      placeholder: '输入单词或中文查词',
-      enter: function (action, callbackSetList) {
-        // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
-        const payloadText =
-          action && action.type === 'over' && typeof action.payload === 'string'
-            ? action.payload.trim()
-            : '';
-        if (payloadText && applyEnterWithWord(payloadText, callbackSetList)) return;
+      mode: 'list',
+      args: {
+        placeholder: '输入单词或中文查词',
+        enter: function (action, callbackSetList) {
+          // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
+          const payloadText =
+            action && action.type === 'over' && typeof action.payload === 'string'
+              ? action.payload.trim()
+              : '';
+          if (payloadText && applyEnterWithWord(payloadText, callbackSetList)) return;
 
-        // 通过关键字进入：直接读取剪贴板（用户需先自行 Ctrl+C 复制选中文字），有内容则自动查词
-        const text = readClipboardText();
-        if (text && applyEnterWithWord(text, callbackSetList)) return;
-        callbackSetList([
-          { title: '欢迎使用本地词典', description: '先复制要查的词 (Ctrl+C)，再打开本插件即可自动查词；或在上方输入框输入单词' }
-        ]);
-      },
-      search: function (action, searchWord, callbackSetList) {
-        if (!searchWord || !searchWord.trim()) {
-          callbackSetList([]);
-          return;
-        }
-        const w = searchWord.trim();
-        const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
-        const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-        const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
-        backend.queryWord(w, sourceLang, targetLang, function (err, result) {
-          callbackSetList(buildListItems(w, result || { found: false }, isZhToEn));
-        });
-      },
-      select: function (action, itemData, callbackSetList) {
-        let textToCopy = itemData.title;
-        if (itemData.title === '词库未就绪' || itemData.title === '未找到释义' || itemData.title === '欢迎使用本地词典') {
-          textToCopy = itemData.description;
-        }
-        if (typeof utools !== 'undefined') {
-          utools.copyText(textToCopy);
-          utools.hideMainWindow();
-          utools.showNotification('已复制内容');
+          // 通过关键字进入：直接读取剪贴板（用户需先自行 Ctrl+C 复制选中文字），有内容则自动查词
+          const text = readClipboardText();
+          if (text && applyEnterWithWord(text, callbackSetList)) return;
+          callbackSetList([
+            { title: '欢迎使用本地词典', description: '先复制要查的词 (Ctrl+C)，再打开本插件即可自动查词；或在上方输入框输入单词' }
+          ]);
+        },
+        search: function (action, searchWord, callbackSetList) {
+          if (!searchWord || !searchWord.trim()) {
+            callbackSetList([]);
+            return;
+          }
+          const w = searchWord.trim();
+          const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
+          const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
+          const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+          backend.queryWord(w, sourceLang, targetLang, function (err, result) {
+            callbackSetList(buildListItems(w, result || { found: false }, isZhToEn));
+          });
+        },
+        select: function (action, itemData, callbackSetList) {
+          let textToCopy = itemData.title;
+          if (itemData.title === '词库未就绪' || itemData.title === '未找到释义' || itemData.title === '欢迎使用本地词典') {
+            textToCopy = itemData.description;
+          }
+          if (typeof utools !== 'undefined') {
+            utools.copyText(textToCopy);
+            utools.hideMainWindow();
+            utools.showNotification('已复制内容');
+          }
         }
       }
     }
-  }
   };
 }
 if (typeof module !== 'undefined' && module.exports) {

@@ -20,9 +20,8 @@
 - **后端选择**：preload 通过**后端选择变量**决定使用哪一个后端；**当前默认选择 Helsinki-NLP 模型**。该变量后续将交由配置页面读写，实现用户可选的 ecdict / Helsinki 切换（见 2.3 节）。
 - **模型分发与首次解压**：发布包中在 `resources/` 下提供**压缩后的模型包**（如 `helsinki-opus-en-zh.tar.gz` 或按实际命名）；Helsinki 后端在首次需要翻译时检查解压目录是否存在，若不存在则从该压缩包解压到指定目录（如 `resources/helsinki-models/` 或用户数据目录），解压成功后可选删除压缩包（与 spec-00003 词库 .gz 行为类似），后续直接使用已解压模型。
 
-- **运行环境与 `@xenova/transformers` 的加载方式**：插件可能运行在 **Node**（如本机单测、CLI）或 **Electron**（如 uTools）中。`@xenova/transformers` 在 Node 下会加载 onnxruntime-node 的原生绑定，在 Electron 中易因 ABI 不一致导致进程崩溃（如 "Module did not self-register"）。因此采用**双路径架构**：
-  - **Node 环境**：Helsinki 后端在 `backends/helsinki.js` 内直接 `import('@xenova/transformers')`，解压与推理均在 Node 完成，供单测与本机运行。
-  - **Electron/uTools 环境（方案3）**：preload 中**不**加载 `@xenova/transformers`；**推理在独立 Node 子进程**中完成。preload 仅负责解压与路径解析，通过**进程间通信**（如 stdio、socket 或本地 HTTP）将待译文本发给子进程，子进程内加载 `backends/helsinki.js` 或等价逻辑并 `import('@xenova/transformers')` 执行翻译，将结果回传。主进程/渲染进程不加载 onnxruntime-node，避免崩溃。
+- **运行环境与 `@xenova/transformers` 的加载方式**：插件可能运行在 **Node**（如本机单测、CLI）或 **Electron**（如 uTools）中。
+  - 尝试在所有环境中（含 Node 和 Electron/uTools），直接在 `backends/helsinki.js` 内使用动态 `import('@xenova/transformers')` 语法导入模块，完成解压与推理。不再使用独立 Node 子进程。
 
 **目标软件架构（类图）**：
 
@@ -131,9 +130,7 @@ Preload --> 用户 : 下拉列表展示
 - **实现方式**：
   - 推理引擎：**@xenova/transformers**（Node 下使用 ONNX）或 **onnxruntime-node** 直接加载 ONNX 格式的 OPUS-MT 模型；模型文件由维护者预先从 Hugging Face 等下载并转为可打包格式，再压缩。
   - 解压使用 Node 内置 `zlib` 或 `tar` 库（如 `tar.gz` 需用 `tar` 解包）将压缩包解到 `modelDir`，逻辑封装在 `ensureModelUnpacked()` 或等价函数内，对外仅暴露「模型是否就绪」。
-  - **运行环境区分**（避免 Electron 下 `import('@xenova/transformers')` 崩溃）：
-    - **Node 环境**（单测、本机）：使用 `backends/helsinki.js` 的完整实现，在 Node 内 `import('@xenova/transformers')` 并完成解压与推理。
-    - **Electron/uTools 环境**：preload 不加载 @xenova/transformers，仅做解压与路径；推理在**独立 Node 子进程**中执行，preload 通过 IPC 与子进程通信。详见 **2.5 Electron/uTools 下 Helsinki 推理（方案3）**。
+  - **运行环境统一处理**：不再区分 Node 环境和 Electron 环境。不论是单测、本机还是 uTools 中，均尝试直接在 `backends/helsinki.js` 中使用动态 `import('@xenova/transformers')`。不再使用独立 Node 子进程和 IPC（详见 2.5 节）。
 - **错误与边界**：模型未下载、解压失败、推理异常时均返回 `{ found: false, message?: "..." }`，不向上抛未捕获异常。
 
 #### 2.3 后端选择（preload.js）
@@ -152,29 +149,15 @@ Preload --> 用户 : 下拉列表展示
   3. 若压缩包也不存在 → 返回 `{ found: false, message: "模型未就绪" }`。
 - **脚本**：在 `scripts/` 下提供**下载与打包脚本**（如 `scripts/download_helsinki_model.py` 或 `.sh`），供维护者执行：从 Helsinki-NLP/Hugging Face 下载指定 OPUS-MT 模型（如 en↔zh），转换为可被后端加载的格式（如 ONNX），并压缩为 `resources/` 下约定名称的压缩包；脚本说明写入 README 或脚本内注释。
 
-#### 2.5 Electron/uTools 下 Helsinki 推理（方案3）
+#### 2.5 Electron/uTools 下 Helsinki 推理
 
-在 Electron（如 uTools）中，主进程/preload **不**加载 @xenova/transformers；**翻译在独立 Node 子进程**中执行，preload 通过**进程间通信（IPC）**向子进程发送请求并接收结果，避免 onnxruntime-node 在主进程导致的崩溃。
+在 Electron（如 uTools）中，我们将尝试**直接使用动态 `import()` 语句加载** `@xenova/transformers`。
 
-- **2.5.1 子进程入口脚本**
-  - 新增可被 `node` 直接启动的脚本（如 `scripts/helsinki-translate-worker.js` 或置于 `backends/` 下），作为**常驻子进程**或**按需 spawn** 的 worker。
-  - 子进程内：读取来自 stdin 或 socket 的请求（约定格式，如 JSON 行：`{ word, sourceLang, targetLang }`），调用与 `backends/helsinki.js` 一致的推理逻辑（可 `require` helsinki.js 或内联解压 + `import('@xenova/transformers')`），将结果写入 stdout 或通过 socket 回写（如 `{ found, translation?, message? }`）。
-  - 子进程需能解析**模型路径**（通过环境变量、命令行参数或首行配置传入），确保使用与 preload 解压后的同一 `modelDir`。
+- 不采用子进程方案，避免增加进程通信的复杂性。
+- 在 `backends/helsinki.js` 中直接使用 `import('@xenova/transformers')` 加载模型和执行翻译。
+- 核心在于**同进程加载**，不再依赖进程间的划分。如果在 Electron 环境下遇到 `onnxruntime-node` 不兼容或者崩溃的问题，将优先尝试直接在主进程中通过常规模块加载的方式解决。
 
-- **2.5.2 preload 侧：仅解压与路径，不加载 transformers**
-  - 当 `currentBackendId === 'helsinki'` 且运行在 **Electron/uTools** 时，preload **不要** `require('./backends/helsinki.js')`（会触发 `import('@xenova/transformers')`）。
-  - 使用仅含解压与路径的模块（如从 helsinki.js 抽离的 `backends/helsinki-node-only.js`，或 helsinki.js 在「仅路径解压」模式下的接口）：执行 `ensureModelUnpacked()`，若 `!ok` 则后续翻译请求直接回调 `{ found: false, message }`；若 `ok`，得到 `modelDir` 绝对路径，供与子进程约定模型路径。
-
-- **2.5.3 IPC 协议与通信方式**
-  - **通信方式**（任选其一或由实现选定）：**stdio**（子进程 stdin/stdout，JSON 行协议）、**本地 TCP/Unix socket**、或**本地 HTTP**（子进程内起小型 HTTP 服务，preload 发 POST 请求）。
-  - **请求**：preload 将 `{ word, sourceLang, targetLang, modelDir? }` 发给子进程（若子进程由 preload 启动，可将 `modelDir` 通过环境变量或启动参数传入，不必每请求都传）。
-  - **响应**：子进程返回与 `queryWord` 回调一致的结构 `{ found, translation?, message? }`；超时或子进程未就绪时 preload 回调 `{ found: false, message: '神经翻译未就绪' }` 或等价提示。
-
-- **2.5.4 preload 中 Electron 分支**
-  - 检测到 Electron（如 `process.versions.electron`）且 `currentBackendId === 'helsinki'` 时：启动或连接上述子进程（若采用按需 spawn，可在首次翻译请求时启动），执行解压与路径校验后，将 enter/search 的翻译请求通过 IPC 发给子进程，收到响应后调用现有 `buildListItems` 等逻辑展示。
-  - 若子进程启动失败或不可用，回退到 `{ found: false, message: '神经翻译未就绪' }` 或提示用户。
-
-**产出**：在 uTools 中选用 Helsinki 时，主进程不加载 @xenova/transformers；推理在独立 Node 子进程中完成，preload 仅负责解压、路径与 IPC，无 onnxruntime-node 崩溃。
+**产出**：在 uTools 中直接在当前进程加载模块、完成翻译操作。
 
 ### 3. 单元测试（node:test）
 
@@ -194,15 +177,14 @@ Preload --> 用户 : 下拉列表展示
 3. 从 `modelDir` 加载模型，执行推理得到中文译文，回调 `(null, { found: true, translation: "..." })`。
 4. preload 按统一结构组列表项并展示；后续请求若模型已加载可直接推理，无需重复解压。
 
-**Electron/uTools 环境（方案3）**：preload 不调用 `backend.queryWord`，改为执行解压与路径校验后，将 `{ word, sourceLang, targetLang }` 及模型路径通过 IPC 发给独立 Node 子进程；子进程内加载 helsinki 推理逻辑并返回 `{ found, translation }`；preload 收到结果后同样按统一结构组列表项并展示。
+**Electron/uTools 环境**：与 Node 环境相同，直接调用 `backend.queryWord`，在内部动态 `import` 加载 transformers 并执行推理。
 
 ### 5. 文件与目录
 
 ```
 backends/
 ├── ecdict.js
-├── helsinki.js                  # Helsinki-NLP 翻译后端（Node 内推理）
-└── helsinki-node-only.js        # 可选：仅解压与路径，供 Electron 下 preload 使用（方案3）
+├── helsinki.js                  # Helsinki-NLP 翻译后端
 
 resources/
 ├── ecdict.db.gz
@@ -212,8 +194,7 @@ resources/
 
 scripts/
 ├── zip_dicts.py
-├── download_helsinki_model.py   # 维护者下载并压缩模型
-└── helsinki-translate-worker.js # 方案3：子进程入口，供 Electron 下 IPC 翻译
+└── download_helsinki_model.py   # 维护者下载并压缩模型
 
 test/
 ├── ecdict.test.js
@@ -232,7 +213,7 @@ test/
 - 模型以压缩包形式随插件发布，首次使用时解压到指定目录，解压成功后可选删除压缩包；后续直接使用已解压模型。
 - 识别中英文的方法仍为 preload 的 `isLikelyChinese`，未改动。
 - `node --test test/helsinki.test.js` 通过，能验证在有模型情况下可完成 en↔zh 翻译，无模型时返回 `found: false` 及合理 message。
-- **Electron/uTools 下（方案3）**：选用 Helsinki 时主进程不加载 `@xenova/transformers`，推理在独立 Node 子进程中完成，preload 通过 IPC 与子进程通信，无因 onnxruntime-node 导致的崩溃。
+- **Electron/uTools 下**：尝试直接在当前进程使用动态 `import('@xenova/transformers')` 加载并执行推理，不再使用原定的子进程方案。
 - 提供脚本供维护者预下载并压缩模型，文档或注释说明用法。
 - preload 中增加后端选择变量，默认值为 Helsinki；根据该变量创建对应后端，后续可通过配置页面切换。
 
