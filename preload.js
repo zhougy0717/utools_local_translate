@@ -38,6 +38,12 @@ if (appConfig.backends.helsinki_model) {
   backend = createEcdictBackend();
 }
 
+if (typeof window !== 'undefined') {
+  if (backend && typeof backend.stopWorker === 'function') {
+    window.stopLocalWorker = backend.stopWorker.bind(backend);
+  }
+}
+
 const MAX_SELECTION_LENGTH = 200;
 
 /** 检测文本是否包含中文（CJK 统一汉字），用于决定英→中或中→英 */

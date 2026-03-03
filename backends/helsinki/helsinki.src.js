@@ -1,17 +1,15 @@
 const path = require('path');
 const fs = require('fs');
-const tar = require('tar');
-const { env, pipeline } = require('@xenova/transformers');
+const { Worker } = require('worker_threads');
+const crypto = require('crypto');
 
 function createHelsinkiBackend(options) {
     const archivePath = options?.modelArchivePath || path.join(__dirname, '..', '..', 'resources', 'helsinki-opus-en-zh.tar.gz');
     const modelDir = options?.modelDir || path.join(__dirname, '..', '..', 'resources', 'helsinki-models');
 
-    let pipelinePromises = {
-        'en-zh': null,
-        'zh-en': null
-    };
     let unpackPromise = null;
+    let worker = null;
+    const pendingRequests = new Map();
 
     async function ensureModelUnpacked() {
         if (!fs.existsSync(modelDir)) {
@@ -27,29 +25,51 @@ function createHelsinkiBackend(options) {
         return unpackPromise;
     }
 
-    async function loadPipeline(sourceLang, targetLang) {
-        const key = `${sourceLang}-${targetLang}`;
-        if (!pipelinePromises[key]) {
-            pipelinePromises[key] = (async () => {
+    function getWorker() {
+        if (!worker) {
+            worker = new Worker(path.join(__dirname, '..', 'worker.js'));
 
-                // 配置本地模型路径与离线支持
-                env.allowLocalModels = true;
-                env.allowRemoteModels = false;
-                env.useBrowserCache = false;
-                env.useFS = true;
-                env.localModelPath = modelDir;
-                if (env.backends && env.backends.onnx && env.backends.onnx.wasm) {
-                    env.backends.onnx.wasm.wasmPaths = __dirname + path.sep;
-                    env.backends.onnx.wasm.numThreads = 1;
+            worker.on('message', (msg) => {
+                if (msg.type === 'result') {
+                    const callback = pendingRequests.get(msg.id);
+                    if (callback) {
+                        pendingRequests.delete(msg.id);
+                        // Forward the result structure natively
+                        callback(null, msg);
+                    }
                 }
+            });
 
-                const modelName = sourceLang === 'en' ? 'helsinki_models/opus-mt-en-zh' : 'helsinki_models/opus-mt-zh-en';
-                return await pipeline('translation', modelName, {
-                    quantized: true
-                });
-            })();
+            worker.on('error', (err) => {
+                console.error('Helsinki Worker error:', err);
+                for (const [id, cb] of pendingRequests.entries()) {
+                    cb(null, { found: false, message: 'Worker 发生严重错误: ' + err.message });
+                }
+                pendingRequests.clear();
+                worker = null;
+            });
+
+            worker.on('exit', (code) => {
+                if (code !== 0) {
+                    console.error(`Helsinki Worker stopped with exit code ${code}`);
+                }
+                worker = null;
+            });
         }
-        return await pipelinePromises[key];
+        return worker;
+    }
+
+    function stopWorker() {
+        if (worker) {
+            worker.terminate();
+            worker = null;
+
+            // Abort and clear all pending requests safely
+            for (const [id, cb] of pendingRequests.entries()) {
+                cb(null, { found: false, message: 'Worker 已被主动终止' });
+            }
+            pendingRequests.clear();
+        }
     }
 
     function queryWord(word, sourceLang, targetLang, callback) {
@@ -79,25 +99,29 @@ function createHelsinkiBackend(options) {
                     return callback(null, { found: false, message: unpack.message });
                 }
 
-                const pipe = await loadPipeline(sourceLang, targetLang);
-                const res = await pipe(String(word).trim(), {
-                    max_new_tokens: 500,
-                    repetition_penalty: 1.2,
-                    no_repeat_ngram_size: 3
+                const id = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+
+                pendingRequests.set(id, callback);
+
+                const w = getWorker();
+                const modelName = sourceLang === 'en' ? 'helsinki_models/opus-mt-en-zh' : 'helsinki_models/opus-mt-zh-en';
+
+                w.postMessage({
+                    id,
+                    type: 'query',
+                    word: String(word).trim(),
+                    pipelineTask: 'translation',
+                    modelName: modelName,
+                    modelDir: modelDir
                 });
 
-                if (res && res.length > 0 && res[0].translation_text) {
-                    callback(null, { found: true, translation: res[0].translation_text });
-                } else {
-                    callback(null, { found: false });
-                }
             } catch (e) {
-                callback(null, { found: false, message: '模型推理异常: ' + e.message });
+                callback(null, { found: false, message: '模型代理队列异常: ' + e.message });
             }
         })();
     }
 
-    return { queryWord };
+    return { queryWord, stopWorker };
 }
 
 module.exports = { createHelsinkiBackend };
