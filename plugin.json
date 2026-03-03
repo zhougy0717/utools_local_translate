@@ -3,6 +3,16 @@
   "logo": "translate.png",
   "features": [
     {
+      "code": "settings",
+      "explain": "设置 / 本地翻译配置",
+      "cmds": [
+        "设置",
+        "配置",
+        "config",
+        "settings"
+      ]
+    },
+    {
       "code": "dict",
       "explain": "本地词典查词（Demo）",
       "icon": "translate.png",

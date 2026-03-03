@@ -6,16 +6,37 @@
 const { createEcdictBackend } = require('./backends/ecdict.js');
 const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
 
-const currentBackendId = 'helsinki'; // 默认选择 Helsinki 模型
+// 默认配置
+let appConfig = {
+  resourcePath: '',
+  backends: {
+    offline_dict: true,
+    helsinki_model: false
+  }
+};
+
+// 从 uTools 数据库中读取配置
+if (typeof utools !== 'undefined') {
+  const storedConfig = utools.dbStorage.getItem('app_config');
+  if (storedConfig) {
+    appConfig = storedConfig;
+  }
+}
 
 // 后续用于持久化配置：控制是否展示查询时延列表项
 const GLOBAL_CONFIG = {
   showTranslationCost: true
 };
 
-const backend = currentBackendId === 'helsinki'
-  ? createHelsinkiBackend()
-  : createEcdictBackend();
+// 后端初始化逻辑（简单优先级：Helsinki > ECDict）
+// 这里如果是多选框都选了，目前优先级给大模型
+let backend;
+if (appConfig.backends.helsinki_model) {
+  // 如果 createHelsinkiBackend 需要路径，可以在这里传入 appConfig.resourcePath
+  backend = createHelsinkiBackend();
+} else {
+  backend = createEcdictBackend();
+}
 
 const MAX_SELECTION_LENGTH = 200;
 
@@ -112,6 +133,10 @@ if (typeof window !== 'undefined') {
       args: {
         placeholder: '输入单词或中文查词',
         enter: function (action, callbackSetList) {
+          const configContainer = document.getElementById('config-container');
+          if (configContainer) {
+            configContainer.style.display = 'none';
+          }
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
             action && action.type === 'over' && typeof action.payload === 'string'
@@ -172,6 +197,48 @@ if (typeof window !== 'undefined') {
             utools.hideMainWindow();
             utools.showNotification('已复制内容');
           }
+        }
+      }
+    },
+    settings: {
+      mode: 'none',
+      args: {
+        enter: (action) => {
+          if (typeof utools !== 'undefined') {
+            utools.showMainWindow();
+            utools.setExpendHeight(600);
+          }
+
+          // 确保不重复添加
+          let configContainer = document.getElementById('config-container');
+          if (!configContainer) {
+            configContainer = document.createElement('div');
+            configContainer.id = 'config-container';
+            configContainer.style.position = 'absolute';
+            // 覆盖整个 body
+            configContainer.style.position = 'fixed';
+            configContainer.style.top = '0';
+            configContainer.style.left = '0';
+            configContainer.style.width = '100vw';
+            configContainer.style.height = '100vh';
+            configContainer.style.zIndex = '999999';
+            configContainer.style.backgroundColor = '#fff';
+
+            const iframe = document.createElement('iframe');
+            const path = require('path');
+            let normalizedPath = path.join(__dirname, 'config', 'index.html').replace(/\\/g, '/');
+            if (!normalizedPath.startsWith('/')) {
+              normalizedPath = '/' + normalizedPath;
+            }
+            iframe.src = 'file://' + normalizedPath;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.display = 'block';
+            configContainer.appendChild(iframe);
+            document.body.appendChild(configContainer);
+          }
+          configContainer.style.display = 'block';
         }
       }
     }

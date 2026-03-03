@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>配置 - 本地翻译</title>
+    <style>
+        body {
+            background: var(--vscode-editor-background, #ffffff);
+            color: var(--vscode-editor-foreground, #333333);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 40px;
+            box-sizing: border-box;
+            width: 100vw;
+            height: 100vh;
+        }
+
+        #utools-settings-mockup {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .c-header {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--vscode-panel-border, #e0e0e0);
+            padding-bottom: 12px;
+        }
+
+        .c-section {
+            margin-bottom: 24px;
+        }
+
+        .c-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--vscode-descriptionForeground, #666666);
+        }
+
+        .c-input-group {
+            display: flex;
+            gap: 10px;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid var(--vscode-input-border, #cccccc);
+            border-radius: 6px;
+            background: var(--vscode-input-background, #fafafa);
+            color: var(--vscode-input-foreground, #333333);
+            font-size: 14px;
+            outline: none;
+        }
+
+        button {
+            padding: 8px 16px;
+            background-color: var(--vscode-button-background, #007aff);
+            color: var(--vscode-button-foreground, #ffffff);
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: var(--vscode-button-hoverBackground, #0062cc);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            color: var(--vscode-editor-foreground, #333333);
+            border: 1px solid var(--vscode-input-border, #cccccc);
+        }
+
+        .c-checkbox-group {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .c-checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            cursor: pointer;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+        }
+
+        .c-desc {
+            font-size: 12px;
+            color: var(--vscode-descriptionForeground, #888888);
+            margin-top: 8px;
+            display: block;
+        }
+
+        .c-footer {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 30px;
+            padding-top: 16px;
+            border-top: 1px solid var(--vscode-panel-border, #e0e0e0);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="utools-settings-mockup">
+        <div class="c-header">
+            ⚙️ 本地翻译设置
+        </div>
+
+        <div class="c-section">
+            <div class="c-title">资源下载路径</div>
+            <div class="c-input-group">
+                <input type="text" id="resourcePath" value="" placeholder="请输入路径或点击右侧按钮选择">
+                <button id="btnSelectPath" class="secondary">更改目录</button>
+            </div>
+            <span class="c-desc">用于存放离线词库和 Helsinki-NLP 大模型文件</span>
+        </div>
+
+        <div class="c-section">
+            <div class="c-title">后端选择</div>
+            <div class="c-checkbox-group">
+                <label class="c-checkbox-label">
+                    <input type="checkbox" id="backendOfflineDict">
+                    离线词库 (默认开启，用于单词查询)
+                </label>
+                <label class="c-checkbox-label">
+                    <input type="checkbox" id="backendHelsinkiModel">
+                    本地大模型翻译 (Helsinki-NLP，用于长句翻译)
+                </label>
+            </div>
+        </div>
+
+        <div class="c-footer">
+            <button id="btnSave">保存配置</button>
+        </div>
+    </div>
+    <script src="./renderer.js"></script>
+</body>
+
+</html>
