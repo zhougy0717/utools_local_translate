@@ -6,13 +6,19 @@ const path = require('path');
 const fs = require('fs');
 
 function createDictBackend(options) {
-  const dbPath = options && options.dictRepoPath
-    ? path.join(options.dictRepoPath, 'ecdict.db')
-    : (options && options.dbPath != null ? options.dbPath : path.join(__dirname, '..', '..', 'resources', 'ecdict.db'));
-  const cccedictDbPath = options && options.dictRepoPath
-    ? path.join(options.dictRepoPath, 'cccedict.db')
-    : (options && options.cccedictDbPath != null ? options.cccedictDbPath : path.join(__dirname, '..', '..', 'resources', 'cccedict.db'));
+  if (!options || !options.dictRepoPath) {
+    // 强制要求配置路径
+    return {
+      queryWord: function (word, sourceLang, targetLang, callback) {
+        if (typeof sourceLang === 'function') callback = sourceLang;
+        else if (typeof targetLang === 'function') callback = targetLang;
+        callback(null, { found: false, message: '请配置词典绝对路径，不配置无法使用' });
+      }
+    };
+  }
 
+  const dbPath = path.join(options.dictRepoPath, 'ecdict.db');
+  const cccedictDbPath = path.join(options.dictRepoPath, 'cccedict.db');
 
   function queryWithSqlJs(word, callback) {
     try {
@@ -88,16 +94,13 @@ function createDictBackend(options) {
    * @param {string} sourceLang
    * @param {string} targetLang
    * @param {function(Error?, { found: boolean, translation?: string, phonetic?: string, message?: string }?)} callback
-   * @param {function(string)} [onProgress]
    */
-  function queryWord(word, sourceLang, targetLang, callback, onProgress) {
+  function queryWord(word, sourceLang, targetLang, callback) {
     if (typeof sourceLang === 'function') {
-      onProgress = targetLang;
       callback = sourceLang;
       sourceLang = 'en';
       targetLang = 'zh';
     } else if (typeof targetLang === 'function') {
-      onProgress = callback;
       callback = targetLang;
       targetLang = 'zh';
     } else if (typeof callback !== 'function') {
@@ -137,21 +140,7 @@ function createDictBackend(options) {
       }
 
       if (!fs.existsSync(cccedictDbPath)) {
-        const cZipPath = options && options.dictRepoPath
-          ? path.join(options.dictRepoPath, 'cedict_1_0_ts_utf-8_mdbg.zip')
-          : path.join(__dirname, '..', '..', 'resources', 'cedict_1_0_ts_utf-8_mdbg.zip');
-        if (fs.existsSync(cZipPath)) {
-          if (onProgress) onProgress('正在触发 cccedict 离线词典构建...');
-          const { buildCccedict } = require('./cccedictBuilder');
-          const targetDir = path.dirname(cccedictDbPath);
-          buildCccedict(cZipPath, targetDir, onProgress || (() => { })).then(() => {
-            executeCccedictQuery();
-          }).catch(err => {
-            callback(null, { found: false, message: '词典自动转换失败: ' + err.message });
-          });
-        } else {
-          callback(null, { found: false, message: '词库未就绪：缺少 cccedict 中英词典资源，请按文档自行下载' });
-        }
+        callback(null, { found: false, message: '请配置词典绝对路径，不配置无法使用。缺少 cccedict.db' });
         return;
       }
       executeCccedictQuery();
@@ -184,21 +173,7 @@ function createDictBackend(options) {
     }
 
     if (!fs.existsSync(dbPath)) {
-      const eZipPath = options && options.dictRepoPath
-        ? path.join(options.dictRepoPath, 'ecdict-sqlite-28.zip')
-        : path.join(__dirname, '..', '..', 'resources', 'ecdict-sqlite-28.zip');
-      if (fs.existsSync(eZipPath)) {
-        if (onProgress) onProgress('正在触发 ecdict 离线词典构建...');
-        const { build } = require('./builder');
-        const targetDir = path.dirname(dbPath);
-        build(eZipPath, targetDir, onProgress || (() => { })).then(() => {
-          executeEcdictQuery();
-        }).catch(err => {
-          callback(null, { found: false, message: '词典自动转换失败: ' + err.message });
-        });
-      } else {
-        callback(null, { found: false, message: '词库未就绪：缺少 ecdict 英中词典资源，请按文档自行下载' });
-      }
+      callback(null, { found: false, message: '请配置词典绝对路径，不配置无法使用。缺少 ecdict.db' });
       return;
     }
     executeEcdictQuery();
