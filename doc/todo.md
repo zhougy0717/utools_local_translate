@@ -4,8 +4,13 @@
 - [x] slash command
 
 # 资源下载
-- [ ] 支持自动从gitee下载ecdict-sqlite-28.zip
 - [ ] 支持自动下载Helsinki-NLP/opus-mt模型
+
+# 翻译功能
+- [ ] 支持下载HY-MT-1.5B模型
+- [ ] 支持基于HY-MT-1.5B模型翻译
+
+# 词典功能
 - [ ] 前缀联想、模糊匹配（输入时展示多个候选词）。
 
 

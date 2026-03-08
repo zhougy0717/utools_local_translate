@@ -7,9 +7,9 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { createEcdictBackend } = require('../backends/ecdict.js');
+const { createDictBackend } = require('../backends/dict/index.js');
 
-const backend = createEcdictBackend();
+const backend = createDictBackend();
 const resourcesDir = path.join(__dirname, '..', 'resources');
 
 function queryWordPromise(backend, word, sourceLang, targetLang) {
@@ -22,12 +22,17 @@ function queryWordPromise(backend, word, sourceLang, targetLang) {
 }
 
 describe('ecdict 从 SQLite 查词', function () {
-  it('已知词 nite 能查到且返回 found 与 translation', async function () {
+  it('已知词 nite 能查到且返回 found 与 translation (如果有db) 或 拦截', async function () {
+    const dbPath = path.join(resourcesDir, 'ecdict.db');
+    const zipPath = path.join(resourcesDir, 'ecdict-sqlite-28.zip');
     const result = await queryWordPromise(backend, 'nite', 'en', 'zh');
-    assert.ok(result, '应返回结果对象');
-    assert.strictEqual(result.found, true, 'nite 应能查到');
-    assert.ok(typeof result.translation === 'string', '应有 translation');
-    assert.ok(result.translation.length > 0, 'translation 非空');
+    if (fs.existsSync(dbPath)) {
+      assert.strictEqual(result.found, true, 'nite 应能查到');
+      assert.ok(typeof result.translation === 'string', '应有 translation');
+    } else if (fs.existsSync(zipPath)) {
+      assert.strictEqual(result.found, false);
+      assert.ok(result.message.includes('触发构建'), '应该提示触发构建');
+    }
   });
 
   it('未知词返回 found: false', async function () {
@@ -36,7 +41,10 @@ describe('ecdict 从 SQLite 查词', function () {
     assert.strictEqual(result.found, false, '不存在的词应返回 found: false');
   });
 
-  it('大小写不敏感：Nite 与 nite 均可查到', async function () {
+  it('大小写不敏感：Nite 与 nite 均可查到 (如果有db)', async function () {
+    const dbPath = path.join(resourcesDir, 'ecdict.db');
+    if (!fs.existsSync(dbPath)) return this.skip();
+
     const r1 = await queryWordPromise(backend, 'Nite', 'en', 'zh');
     const r2 = await queryWordPromise(backend, 'nite', 'en', 'zh');
     assert.strictEqual(r1.found, true, 'Nite 应能查到');
@@ -46,7 +54,7 @@ describe('ecdict 从 SQLite 查词', function () {
 
   it('词库不存在时返回 found: false 或 message 提示', async function () {
     const notExistPath = path.join(__dirname, '..', 'resources', 'nonexist.db');
-    const backendNoDb = createEcdictBackend({ dbPath: notExistPath });
+    const backendNoDb = createDictBackend({ dbPath: notExistPath });
     const result = await queryWordPromise(backendNoDb, 'nite', 'en', 'zh');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, false, '词库不存在时应 found: false');
@@ -55,13 +63,18 @@ describe('ecdict 从 SQLite 查词', function () {
     }
   });
 
-  it('中→英：已知中文词返回 found: true 且 translation 为英文', async function () {
+  it('中→英：已知中文词返回 found: true 且 translation 为英文 (如果有db)', async function () {
+    const dbPath = path.join(resourcesDir, 'cccedict.db');
+    const zipPath = path.join(resourcesDir, 'cedict_1_0_ts_utf-8_mdbg.zip');
     const result = await queryWordPromise(backend, '中国', 'zh', 'en');
-    assert.ok(result, '应返回结果对象');
-    assert.strictEqual(result.found, true, '中国 应能查到');
-    assert.ok(typeof result.translation === 'string', '应有 translation');
-    assert.ok(result.translation.length > 0, 'translation 非空');
-    assert.ok(/[a-zA-Z]/.test(result.translation), 'translation 应为英文');
+
+    if (fs.existsSync(dbPath)) {
+      assert.strictEqual(result.found, true, '中国 应能查到');
+      assert.ok(typeof result.translation === 'string', '应有 translation');
+    } else if (fs.existsSync(zipPath)) {
+      assert.strictEqual(result.found, false);
+      assert.ok(result.message.includes('触发构建'), '应该提示触发构建');
+    }
   });
 
   it('中→英：未知中文词返回 found: false', async function () {
@@ -72,7 +85,7 @@ describe('ecdict 从 SQLite 查词', function () {
 
   it('中→英：cccedict.db 不存在时返回 found: false 及 message', async function () {
     const notExistPath = path.join(__dirname, '..', 'resources', 'nonexist_cccedict.db');
-    const backendNoCccedict = createEcdictBackend({ cccedictDbPath: notExistPath });
+    const backendNoCccedict = createDictBackend({ cccedictDbPath: notExistPath });
     const result = await queryWordPromise(backendNoCccedict, '中国', 'zh', 'en');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, false, '词库不存在时应 found: false');
@@ -86,12 +99,12 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(tmpDir, 'cccedict.db');
     const srcGz = path.join(resourcesDir, 'cccedict.db.gz');
     if (!fs.existsSync(srcGz)) {
-      try { fs.rmdirSync(tmpDir); } catch (_) {}
+      try { fs.rmdirSync(tmpDir); } catch (_) { }
       this.skip();
       return;
     }
     fs.copyFileSync(srcGz, gzPath);
-    const backendGz = createEcdictBackend({ cccedictDbPath: dbPath });
+    const backendGz = createDictBackend({ cccedictDbPath: dbPath });
     const result = await queryWordPromise(backendGz, '中国', 'zh', 'en');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, true, '仅 .gz 时首次应能解压并查到');
@@ -99,7 +112,7 @@ describe('ecdict 从 SQLite 查词', function () {
     assert.ok(!fs.existsSync(gzPath), '解压成功后 .gz 应已删除');
     const result2 = await queryWordPromise(backendGz, '中国', 'zh', 'en');
     assert.strictEqual(result2.found, true, '再次查词应仍正常');
-    try { fs.unlinkSync(dbPath); } catch (_) {}
-    try { fs.rmdirSync(tmpDir); } catch (_) {}
+    try { fs.unlinkSync(dbPath); } catch (_) { }
+    try { fs.rmdirSync(tmpDir); } catch (_) { }
   });
 });

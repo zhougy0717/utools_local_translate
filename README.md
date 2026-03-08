@@ -48,6 +48,18 @@ python3 scripts/zip_dicts.py
 - 若使用压缩发布：发布前运行 `python3 scripts/zip_dicts.py`，将 `resources/` 下的 **ecdict.db.gz**、**cccedict.db.gz** 随插件打包即可；用户首次查词时自动解压并删除 .gz。
 - 若不压缩：发布前确认 `resources/` 下存在 `ecdict.db` 与 `cccedict.db`，随插件一起打包。
 
+## 离线词典资源下载指南
+
+对于资源缺失或自主配置插件资源目录的用户，请按以下步骤获取词典：
+
+1. **英→中词典 (ecdict.db)**
+   - **下载来源**：[skywind3000/ECDICT](https://github.com/skywind3000/ECDICT)的Release页面[ ecdict-sqlite-28.zip](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-sqlite-28.zip)
+   - **安装方法**：将下载后的 `.zip` 文件直接存放于插件的本地资源目录（在插件中输入 `/path` 命令可配置或查看该本地路径）。然后在插件内通过 `/mode` 命令触发词典自动解压与构建即可，提取成功后旧的包将自动清理。
+
+2. **中→英词典 (cccedict.db)**
+   - **下载来源**：中英词典由开源项目 [MDBG Chinese Dictionary](https://www.mdbg.net/chinese/dictionary?page=cedict) 提供数据。
+   - **安装方法**：将下载的cedict_1_0_ts_utf-8_mdbg.zip直接放入插件的本地资源目录（在插件中输入 `/path` 命令可配置或查看该本地路径）。然后在插件内通过 `/mode` 命令触发词典自动解压与构建即可，提取成功后旧的包将自动清理。
+
 ## 开发与测试
 
 - 单元测试：`node --test test/isLikelyChinese.test.js test/ecdict.test.js`

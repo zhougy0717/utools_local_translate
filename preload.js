@@ -3,7 +3,7 @@
  * 使用列表模式，enter 时显示欢迎词；search 时根据输入查词并展示。
  * 支持：用户先 Ctrl+C 复制选中文字，再打开插件时自动读取剪贴板并查词。
  */
-const { createEcdictBackend } = require('./backends/ecdict.js');
+const { createDictBackend } = require('./backends/dict/index.js');
 const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
 const CommandManager = require('./commands/index.js');
 
@@ -37,7 +37,7 @@ let backend;
 if (appConfig.backends.helsinki_model) {
   backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
 } else {
-  backend = createEcdictBackend({ dictRepoPath: appConfig.resourcePath });
+  backend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
 }
 
 if (typeof window !== 'undefined') {
@@ -127,6 +127,8 @@ function applyEnterWithWord(word, callbackSetList) {
     backend.queryWord(w, sourceLang, targetLang, function (err, result) {
       const costMs = Date.now() - startTime;
       callbackSetList(buildListItems(w, result || { found: false }, isZhToEn, costMs));
+    }, function (progressMsg) {
+      callbackSetList([{ title: '词典自动构建中...', description: progressMsg }]);
     });
   }, 50);
 
@@ -196,6 +198,8 @@ if (typeof window !== 'undefined') {
               backend.queryWord(w, sourceLang, targetLang, function (err, result) {
                 const costMs = Date.now() - startTime;
                 callbackSetList(buildListItems(w, result || { found: false }, isZhToEn, costMs));
+              }, function (progressMsg) {
+                callbackSetList([{ title: '词典自动构建中...', description: progressMsg }]);
               });
             }, 50);
           }, DEBOUNCE_DELAY);
@@ -221,7 +225,7 @@ if (typeof window !== 'undefined') {
                 if (appConfig.backends.helsinki_model) {
                   backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
                 } else {
-                  backend = createEcdictBackend({ dictRepoPath: appConfig.resourcePath });
+                  backend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
                 }
                 if (typeof window !== 'undefined' && backend && typeof backend.stopWorker === 'function') {
                   window.stopLocalWorker = backend.stopWorker.bind(backend);

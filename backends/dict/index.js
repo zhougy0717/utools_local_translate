@@ -88,13 +88,16 @@ function createDictBackend(options) {
    * @param {string} sourceLang
    * @param {string} targetLang
    * @param {function(Error?, { found: boolean, translation?: string, phonetic?: string, message?: string }?)} callback
+   * @param {function(string)} [onProgress]
    */
-  function queryWord(word, sourceLang, targetLang, callback) {
+  function queryWord(word, sourceLang, targetLang, callback, onProgress) {
     if (typeof sourceLang === 'function') {
+      onProgress = targetLang;
       callback = sourceLang;
       sourceLang = 'en';
       targetLang = 'zh';
     } else if (typeof targetLang === 'function') {
+      onProgress = callback;
       callback = targetLang;
       targetLang = 'zh';
     } else if (typeof callback !== 'function') {
@@ -108,10 +111,6 @@ function createDictBackend(options) {
     const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
 
     if (isZhToEn) {
-      if (!fs.existsSync(cccedictDbPath)) {
-        callback(null, { found: false, message: '词库未就绪：请确保 cccedict.db 存在' });
-        return;
-      }
       function onCccedictResult(err, row) {
         if (err) {
           callback(null, { found: false, message: err.message || String(err) });
@@ -127,19 +126,38 @@ function createDictBackend(options) {
           phonetic: row.phonetic
         });
       }
-      try {
-        require('sql.js');
-        queryCccedictWithSqlJs(w, onCccedictResult);
-      } catch (e) {
-        callback(null, { found: false, message: e.message || String(e) });
+
+      function executeCccedictQuery() {
+        try {
+          require('sql.js');
+          queryCccedictWithSqlJs(w, onCccedictResult);
+        } catch (e) {
+          callback(null, { found: false, message: e.message || String(e) });
+        }
       }
+
+      if (!fs.existsSync(cccedictDbPath)) {
+        const cZipPath = options && options.dictRepoPath
+          ? path.join(options.dictRepoPath, 'cedict_1_0_ts_utf-8_mdbg.zip')
+          : path.join(__dirname, '..', '..', 'resources', 'cedict_1_0_ts_utf-8_mdbg.zip');
+        if (fs.existsSync(cZipPath)) {
+          if (onProgress) onProgress('正在触发 cccedict 离线词典构建...');
+          const { buildCccedict } = require('./cccedictBuilder');
+          const targetDir = path.dirname(cccedictDbPath);
+          buildCccedict(cZipPath, targetDir, onProgress || (() => { })).then(() => {
+            executeCccedictQuery();
+          }).catch(err => {
+            callback(null, { found: false, message: '词典自动转换失败: ' + err.message });
+          });
+        } else {
+          callback(null, { found: false, message: '词库未就绪：缺少 cccedict 中英词典资源，请按文档自行下载' });
+        }
+        return;
+      }
+      executeCccedictQuery();
       return;
     }
 
-    if (!fs.existsSync(dbPath)) {
-      callback(null, { found: false, message: '词库未就绪：请确保 ecdict.db 存在' });
-      return;
-    }
     function onResult(err, row) {
       if (err) {
         callback(null, { found: false, message: err.message || String(err) });
@@ -155,12 +173,35 @@ function createDictBackend(options) {
         phonetic: row.phonetic
       });
     }
-    try {
-      require('sql.js');
-      queryWithSqlJs(w, onResult);
-    } catch (e) {
-      queryWithCli(w, onResult);
+
+    function executeEcdictQuery() {
+      try {
+        require('sql.js');
+        queryWithSqlJs(w, onResult);
+      } catch (e) {
+        queryWithCli(w, onResult);
+      }
     }
+
+    if (!fs.existsSync(dbPath)) {
+      const eZipPath = options && options.dictRepoPath
+        ? path.join(options.dictRepoPath, 'ecdict-sqlite-28.zip')
+        : path.join(__dirname, '..', '..', 'resources', 'ecdict-sqlite-28.zip');
+      if (fs.existsSync(eZipPath)) {
+        if (onProgress) onProgress('正在触发 ecdict 离线词典构建...');
+        const { build } = require('./builder');
+        const targetDir = path.dirname(dbPath);
+        build(eZipPath, targetDir, onProgress || (() => { })).then(() => {
+          executeEcdictQuery();
+        }).catch(err => {
+          callback(null, { found: false, message: '词典自动转换失败: ' + err.message });
+        });
+      } else {
+        callback(null, { found: false, message: '词库未就绪：缺少 ecdict 英中词典资源，请按文档自行下载' });
+      }
+      return;
+    }
+    executeEcdictQuery();
   }
 
   return { queryWord };

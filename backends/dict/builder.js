@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const AdmZip = require('adm-zip');
+const cccedictBuilder = require('./cccedictBuilder');
 
 /**
  * 构建/提取词典数据库
@@ -71,6 +72,19 @@ async function build(sourceZipPath, targetDir, onProgress) {
     });
 }
 
+async function buildAll(extInfo, onProgress) {
+    const targetDir = extInfo.path;
+    if (extInfo.eZipPath) {
+        onProgress('开始处理 ecdict 词典 (英文)...');
+        await build(extInfo.eZipPath, targetDir, onProgress);
+    }
+    if (extInfo.cZipPath) {
+        onProgress('开始处理 cccedict 词典 (中文)...');
+        await cccedictBuilder.buildCccedict(extInfo.cZipPath, targetDir, onProgress);
+    }
+}
+
 module.exports = {
-    build
+    build,
+    buildAll
 };
