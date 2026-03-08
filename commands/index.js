@@ -10,7 +10,7 @@ const COMMANDS = [
 ];
 
 const CommandManager = {
-    handleSearch(searchWord, callbackSetList) {
+    handleSearch(searchWord, callbackSetList, appConfig) {
         const parts = searchWord.split(/\s+/);
         const cmdToken = parts[0].toLowerCase();
 
@@ -19,7 +19,7 @@ const CommandManager = {
             const targetToken = `/${cmd.trigger.toLowerCase()}`;
             if (cmdToken === targetToken) {
                 const subInput = searchWord.slice(targetToken.length).trim();
-                return cmd.handleSearch(subInput, callbackSetList); // 交给具体命令接管渲染
+                return cmd.handleSearch(subInput, callbackSetList, appConfig); // 交给具体命令接管渲染
             }
         }
 
@@ -43,7 +43,7 @@ const CommandManager = {
         }
     },
 
-    handleSelect(itemData, appConfig) {
+    handleSelect(itemData, appConfig, callbackSetList) {
         if (!itemData.isCommandContext) return {};
 
         // 处理一级列表的点击事件，主动帮用户补全文字
@@ -55,7 +55,7 @@ const CommandManager = {
         const trigger = itemData.commandTrigger;
         const cmd = COMMANDS.find(c => c.trigger === trigger);
         if (cmd) {
-            return cmd.handleSelect(itemData, appConfig);
+            return cmd.handleSelect(itemData, appConfig, callbackSetList);
         }
 
         return {};

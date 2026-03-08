@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const dictBuilder = require('../backends/dict/builder');
+
 const MODES = [
     {
         id: 'offline_dict',
@@ -11,19 +15,72 @@ const MODES = [
     }
 ];
 
+const STATUS = {
+    READY: 'READY',
+    DOWNLOADED_UNPROCESSED: 'DOWNLOADED_UNPROCESSED',
+    UNAVAILABLE: 'UNAVAILABLE'
+};
+
+function getDictStatus(appConfig) {
+    const defaultResPath = path.join(__dirname, '..', 'resources');
+    const repoPath = appConfig.resourcePath || defaultResPath;
+    const dbPath = path.join(repoPath, 'ecdict.db');
+    const zipPath = path.join(repoPath, 'ecdict-sqlite-28.zip');
+
+    if (fs.existsSync(dbPath)) return { status: STATUS.READY, path: repoPath };
+    if (fs.existsSync(zipPath)) return { status: STATUS.DOWNLOADED_UNPROCESSED, path: repoPath, zipPath };
+    return { status: STATUS.UNAVAILABLE, path: repoPath };
+}
+
+function getModelStatus(appConfig) {
+    // 模型状态暂时简单判定（可根据实际模型文件名称改进）
+    const repoPath = appConfig.resourcePath || path.join(__dirname, '..', 'resources', 'models');
+    // 如果存在 model.onnx 或 pytorch_model.bin 表示可以运行（这里简化，如果目录存在切不为空则认为READY）
+    if (fs.existsSync(repoPath)) {
+        try {
+            const files = fs.readdirSync(repoPath);
+            if (files.length > 0) return { status: STATUS.READY };
+        } catch (e) {
+            // ignore
+        }
+    }
+    return { status: STATUS.UNAVAILABLE };
+}
+
+
 module.exports = {
     trigger: 'mode',
     title: '选择模式',
     description: '切换翻译使用的模型或离线词典 (/mode)',
 
-    handleSearch(subInput, callbackSetList) {
+    handleSearch(subInput, callbackSetList, appConfig) {
+        const dictInfo = getDictStatus(appConfig);
+        const modelInfo = getModelStatus(appConfig);
+
         const items = MODES.map(mode => {
+            let statusText = '';
+            let currentStatus = STATUS.UNAVAILABLE;
+            let extInfo = {};
+            if (mode.id === 'offline_dict') {
+                currentStatus = dictInfo.status;
+                extInfo = dictInfo;
+            } else if (mode.id === 'helsinki_model') {
+                currentStatus = modelInfo.status;
+                extInfo = modelInfo;
+            }
+
+            if (currentStatus === STATUS.READY) statusText = '(已就绪)';
+            else if (currentStatus === STATUS.DOWNLOADED_UNPROCESSED) statusText = '(已下载未处理)';
+            else statusText = '(未下载)';
+
             return {
                 title: mode.title,
-                description: mode.description,
+                description: `${mode.description} ${statusText}`,
                 isCommandContext: true,
                 commandTrigger: 'mode', // 标记给 index.js 路由回传
-                modeId: mode.id
+                modeId: mode.id,
+                currentStatus: currentStatus,
+                extInfo: extInfo
             };
         });
 
@@ -37,9 +94,47 @@ module.exports = {
         callbackSetList(filteredItems);
     },
 
-    handleSelect(itemData, appConfig) {
+    handleSelect(itemData, appConfig, callbackSetList) {
         if (!itemData.modeId) return {};
 
+        const status = itemData.currentStatus;
+
+        if (status === STATUS.UNAVAILABLE) {
+            let instructions = [];
+            if (itemData.modeId === 'offline_dict') {
+                instructions = [
+                    { title: '下载离线词典', description: '请前往 ecdict 开源项目下载 ecdict-sqlite-28.zip, 并放入配置的资源目录' },
+                    { title: '如何配置目录？', description: '您可以输入 /path 命令或者在设置页中设置资源路径' }
+                ];
+            } else {
+                instructions = [
+                    { title: '下载翻译模型', description: '请确保在资源目录中下载了 Helsinki-NLP/opus-mt 相关模型文件' },
+                    { title: '如何配置目录？', description: '您可以输入 /path 命令或者在设置页中设置模型路径' }
+                ];
+            }
+            if (typeof callbackSetList === 'function') {
+                callbackSetList(instructions);
+            }
+            return { disableClear: true }; // 不做任何后端刷新与搜索恢复
+        }
+
+        if (status === STATUS.DOWNLOADED_UNPROCESSED && itemData.modeId === 'offline_dict') {
+            if (typeof callbackSetList === 'function' && itemData.extInfo && itemData.extInfo.zipPath) {
+                // 开始解压构建流程
+                callbackSetList([{ title: '词典构建中...', description: '准备解压压缩包，请稍候不要关闭窗口...' }]);
+
+                dictBuilder.build(itemData.extInfo.zipPath, itemData.extInfo.path, (msg) => {
+                    callbackSetList([{ title: '词典构建中...', description: msg }]);
+                }).then(() => {
+                    callbackSetList([{ title: '构建完成', description: 'ecdict.db 已提取完成，压缩包已清理。请重新选择模式！' }]);
+                }).catch(err => {
+                    callbackSetList([{ title: '构建失败', description: String(err) }]);
+                });
+            }
+            return { disableClear: true };
+        }
+
+        // status === STATUS.READY
         // 变更应用配置
         if (itemData.modeId === 'offline_dict') {
             appConfig.backends.offline_dict = true;

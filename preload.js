@@ -35,10 +35,9 @@ const GLOBAL_CONFIG = {
 // 这里如果是多选框都选了，目前优先级给大模型
 let backend;
 if (appConfig.backends.helsinki_model) {
-  // 如果 createHelsinkiBackend 需要路径，可以在这里传入 appConfig.resourcePath
-  backend = createHelsinkiBackend();
+  backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
 } else {
-  backend = createEcdictBackend();
+  backend = createEcdictBackend({ dictRepoPath: appConfig.resourcePath });
 }
 
 if (typeof window !== 'undefined') {
@@ -91,9 +90,10 @@ function buildListItems(searchWord, result, isZhToEn, costTime) {
   // 独立追加时延统计项 (根据配置开关决定是否显示)去除了原本拼接到原本字符串中的功能
   if (costTime && GLOBAL_CONFIG.showTranslationCost) {
     const costSeconds = (costTime / 1000).toFixed(2);
+    const modeDesc = appConfig.backends.helsinki_model ? '模型查询时延' : '词典查询时延';
     list.push({
       title: '⚡ 本地翻译耗时: ' + costSeconds + '秒',
-      description: '大模型推理时间分析',
+      description: modeDesc,
       icon: ''
     });
   }
@@ -116,8 +116,9 @@ function applyEnterWithWord(word, callbackSetList) {
   const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
   const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
 
+  const loadingDesc = appConfig.backends.helsinki_model ? '调用本地大模型，可能需要数秒钟，请稍候...' : '正在检索本地词典，请稍候...';
   callbackSetList([
-    { title: '⏳ 正在翻译中...', description: '调用本地大模型，可能需要数秒钟，请稍候...' }
+    { title: '⏳ 正在检索中...', description: loadingDesc }
   ]);
 
   // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的“请稍候”列表项，规避 WASM 强占 JS 线程引起的假死和白屏
@@ -173,15 +174,16 @@ if (typeof window !== 'undefined') {
           const w = searchWord.trim();
 
           if (w.startsWith('/')) {
-            CommandManager.handleSearch(w, callbackSetList);
+            CommandManager.handleSearch(w, callbackSetList, appConfig);
             return;
           }
 
           lastWordToSearch = w;
 
           searchTimeout = setTimeout(() => {
+            const loadingDesc = appConfig.backends.helsinki_model ? '调用本地大模型，可能需要数秒钟，请稍候...' : '正在检索本地词典，请稍候...';
             callbackSetList([
-              { title: '⏳ 正在翻译中...', description: '调用本地大模型，可能需要数秒钟，请稍候...' }
+              { title: '⏳ 正在检索中...', description: loadingDesc }
             ]);
 
             const sourceLang = isLikelyChinese(w) ? 'zh' : 'en';
@@ -205,7 +207,7 @@ if (typeof window !== 'undefined') {
           }
 
           if (itemData.isCommandContext) {
-            const signal = CommandManager.handleSelect(itemData, appConfig);
+            const signal = CommandManager.handleSelect(itemData, appConfig, callbackSetList);
             if (signal.autoComplete) {
               if (typeof utools !== 'undefined') {
                 utools.setSubInputValue(signal.autoComplete);
@@ -217,9 +219,9 @@ if (typeof window !== 'undefined') {
                   window.stopLocalWorker = null;
                 }
                 if (appConfig.backends.helsinki_model) {
-                  backend = createHelsinkiBackend();
+                  backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
                 } else {
-                  backend = createEcdictBackend();
+                  backend = createEcdictBackend({ dictRepoPath: appConfig.resourcePath });
                 }
                 if (typeof window !== 'undefined' && backend && typeof backend.stopWorker === 'function') {
                   window.stopLocalWorker = backend.stopWorker.bind(backend);
