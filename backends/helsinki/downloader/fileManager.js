@@ -1,7 +1,6 @@
 const fs = require('node:fs');
 const fsPromises = require('node:fs/promises');
 const path = require('node:path');
-const { pipeline } = require('node:stream/promises');
 
 /**
  * 确保目录存在
@@ -36,35 +35,50 @@ async function downloadStreamToFile(response, filePath, onProgress) {
 
         const fileStream = fs.createWriteStream(tmpFilePath);
 
-        // 由于需要统计进度，我们可以插入一个自定义的 Transform (这里为简化用 async iteration / stream node 混搭或通过 response.body 的事件。现代 node 中 response.body 是 ReadableStream (web stream), 可用 Readable.fromWeb)
-        // 注意 Node 18+ 内置 fetch 的 response.body 是 Web Stream
-        // 将 Web Stream 转为 Node Stream
-        const { Readable } = require('node:stream');
-        const nodeReadable = Readable.fromWeb(response.body);
+        // 兼容性方案：直接通过 W3C ReadableStream Reader 手动读取数据块并写入 Node.js WriteStream
+        // 避免使用 Readable.fromWeb()（Node.js v17+ 才支持），以兼容 uTools 内置的 Node 环境
+        const reader = response.body.getReader();
 
-        nodeReadable.on('data', (chunk) => {
-            downloadedSize += chunk.length;
-            bytesSinceLastReport += chunk.length;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-            const now = Date.now();
-            if (now - lastReportedTime >= 500) { // 每500ms汇报一次进度
-                const timeDiff = (now - lastReportedTime) / 1000;
-                const speed = bytesSinceLastReport / timeDiff; // B/s
-                if (onProgress) {
-                    onProgress({
-                        fileName: path.basename(filePath),
-                        downloaded: downloadedSize,
-                        total: totalSize,
-                        speed: speed
-                    });
+                // value 是 Uint8Array，Buffer 已经能识别
+                const chunk = Buffer.from(value);
+                downloadedSize += chunk.length;
+                bytesSinceLastReport += chunk.length;
+
+                // 写入文件，如果缓冲区满则等待排空（背压处理）
+                const canContinue = fileStream.write(chunk);
+                if (!canContinue) {
+                    await new Promise(resolve => fileStream.once('drain', resolve));
                 }
-                lastReportedTime = now;
-                bytesSinceLastReport = 0;
-            }
-        });
 
-        // 管道式写入以防止溢出
-        await pipeline(nodeReadable, fileStream);
+                const now = Date.now();
+                if (now - lastReportedTime >= 500) { // 每500ms汇报一次进度
+                    const timeDiff = (now - lastReportedTime) / 1000;
+                    const speed = bytesSinceLastReport / timeDiff; // B/s
+                    if (onProgress) {
+                        onProgress({
+                            fileName: path.basename(filePath),
+                            downloaded: downloadedSize,
+                            total: totalSize,
+                            speed: speed
+                        });
+                    }
+                    lastReportedTime = now;
+                    bytesSinceLastReport = 0;
+                }
+            }
+        } finally {
+            reader.releaseLock();
+        }
+
+        // 关闭写入流
+        await new Promise((resolve, reject) => {
+            fileStream.end((err) => err ? reject(err) : resolve());
+        });
 
         // 如果未出错，将其由 tmp 变为正式文件
         await fsPromises.rename(tmpFilePath, filePath);

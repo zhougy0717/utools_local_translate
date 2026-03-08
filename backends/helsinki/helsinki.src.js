@@ -1,78 +1,107 @@
 const path = require('path');
-const fs = require('fs');
-const { Worker } = require('worker_threads');
-const crypto = require('crypto');
+const { env, pipeline: transformersPipeline } = require('@xenova/transformers');
+const { isModelReady } = require('./modelChecker');
+const { installModels } = require('./modelInstaller');
 
-function createHelsinkiBackend(options) {
-    const archivePath = options?.modelArchivePath || path.join(__dirname, '..', '..', 'resources', 'helsinki-opus-en-zh.tar.gz');
-    const modelDir = options?.modelDir || path.join(__dirname, '..', '..', 'resources', 'helsinki-models');
-
-    let unpackPromise = null;
-    let worker = null;
-    const pendingRequests = new Map();
-
-    async function ensureModelUnpacked() {
-        if (!fs.existsSync(modelDir)) {
-            return { ok: false, message: '模型未就绪，请确保已下载并放置在指定目录下' };
-        }
-        return { ok: true };
+/**
+ * 配置 @xenova/transformers 使用本地模型
+ */
+function configureEnvironment(modelDir) {
+    env.allowLocalModels = true;
+    env.allowRemoteModels = false;
+    env.useBrowserCache = false;
+    env.useFS = true;
+    if (modelDir) {
+        env.localModelPath = modelDir;
     }
 
-    function getUnpackPromise() {
+    // 强制使用 WASM 后端并正确配置路径
+    // 注意：__dirname 在被打包后的 helsinki.js 中指向的是 backends/helsinki/
+    const wasmRoot = __dirname;
+
+    if (!env.backends) env.backends = {};
+    if (!env.backends.onnx) env.backends.onnx = {};
+
+    // 配置 WASM 路径，确保能找到 .wasm 文件
+    env.backends.onnx.wasm = {
+        wasmPaths: wasmRoot + path.sep,
+        numThreads: 1,
+        proxy: false // 在 Electron 渲染进程中关闭代理模式，直接执行以避免 Worker 报错
+    };
+
+    console.log('[Helsinki] Environment configured:', {
+        localModelPath: env.localModelPath,
+        wasmPaths: env.backends.onnx.wasm.wasmPaths
+    });
+}
+
+function createHelsinkiBackend(options) {
+    const DEFAULT_MODEL_DIR = path.join(__dirname, '..', '..', 'resources', 'helsinki-models');
+
+    let modelDir;
+    const customDir = options?.modelDir || (options?.modelRepoPath ? path.join(options.modelRepoPath, 'helsinki') : null);
+
+    if (customDir && isModelReady(customDir)) {
+        modelDir = customDir;
+    } else if (isModelReady(DEFAULT_MODEL_DIR)) {
+        modelDir = DEFAULT_MODEL_DIR;
+    } else {
+        modelDir = customDir || DEFAULT_MODEL_DIR;
+    }
+
+    const pipelineCache = new Map();
+    let unpackPromise = null;
+
+    async function ensureModelUnpacked(onDownloadProgress) {
+        if (isModelReady(modelDir)) {
+            return { ok: true };
+        }
+
+        try {
+            await installModels(modelDir, (prog) => {
+                if (onDownloadProgress) {
+                    const pct = prog.total > 0
+                        ? Math.round((prog.downloaded / prog.total) * 100)
+                        : 0;
+                    const speedKB = Math.round(prog.speed / 1024);
+                    onDownloadProgress(
+                        `正在下载 ${prog.modelId}/${prog.fileName}: ${pct}% (${speedKB} KB/s)`
+                    );
+                }
+            });
+            return { ok: true };
+        } catch (err) {
+            return { ok: false, message: '模型下载失败: ' + err.message };
+        }
+    }
+
+    function getUnpackPromise(onDownloadProgress) {
         if (!unpackPromise) {
-            unpackPromise = ensureModelUnpacked();
+            unpackPromise = ensureModelUnpacked(onDownloadProgress);
         }
         return unpackPromise;
     }
 
-    function getWorker() {
-        if (!worker) {
-            worker = new Worker(path.join(__dirname, '..', 'worker.js'));
-
-            worker.on('message', (msg) => {
-                if (msg.type === 'result') {
-                    const callback = pendingRequests.get(msg.id);
-                    if (callback) {
-                        pendingRequests.delete(msg.id);
-                        // Forward the result structure natively
-                        callback(null, msg);
-                    }
+    async function getPipeline(modelName) {
+        if (!pipelineCache.has(modelName)) {
+            configureEnvironment(modelDir);
+            const pipePromise = transformersPipeline('translation', modelName, {
+                quantized: true,
+                progress_callback: (info) => {
+                    console.log(`[Helsinki] Loading ${modelName}:`, info);
                 }
             });
-
-            worker.on('error', (err) => {
-                console.error('Helsinki Worker error:', err);
-                for (const [id, cb] of pendingRequests.entries()) {
-                    cb(null, { found: false, message: 'Worker 发生严重错误: ' + err.message });
-                }
-                pendingRequests.clear();
-                worker = null;
-            });
-
-            worker.on('exit', (code) => {
-                if (code !== 0) {
-                    console.error(`Helsinki Worker stopped with exit code ${code}`);
-                }
-                worker = null;
-            });
+            pipelineCache.set(modelName, pipePromise);
         }
-        return worker;
+        return pipelineCache.get(modelName);
     }
 
     function stopWorker() {
-        if (worker) {
-            worker.terminate();
-            worker = null;
-
-            // Abort and clear all pending requests safely
-            for (const [id, cb] of pendingRequests.entries()) {
-                cb(null, { found: false, message: 'Worker 已被主动终止' });
-            }
-            pendingRequests.clear();
-        }
+        pipelineCache.clear();
+        unpackPromise = null;
     }
 
-    function queryWord(word, sourceLang, targetLang, callback) {
+    function queryWord(word, sourceLang, targetLang, callback, onProgress) {
         if (typeof sourceLang === 'function') {
             callback = sourceLang;
             sourceLang = 'en';
@@ -94,29 +123,34 @@ function createHelsinkiBackend(options) {
 
         (async () => {
             try {
-                const unpack = await getUnpackPromise();
+                const unpack = await getUnpackPromise(onProgress);
                 if (!unpack.ok) {
                     return callback(null, { found: false, message: unpack.message });
                 }
 
-                const id = crypto.randomUUID ? crypto.randomUUID() : crypto.randomBytes(16).toString('hex');
+                const modelName = sourceLang === 'en'
+                    ? 'helsinki_models/opus-mt-en-zh'
+                    : 'helsinki_models/opus-mt-zh-en';
 
-                pendingRequests.set(id, callback);
+                const pipe = await getPipeline(modelName);
 
-                const w = getWorker();
-                const modelName = sourceLang === 'en' ? 'helsinki_models/opus-mt-en-zh' : 'helsinki_models/opus-mt-zh-en';
-
-                w.postMessage({
-                    id,
-                    type: 'query',
-                    word: String(word).trim(),
-                    pipelineTask: 'translation',
-                    modelName: modelName,
-                    modelDir: modelDir
+                const res = await pipe(String(word).trim(), {
+                    max_new_tokens: 500,
+                    repetition_penalty: 1.2,
+                    no_repeat_ngram_size: 3
                 });
 
+                if (res && res.length > 0 && res[0].translation_text) {
+                    callback(null, { found: true, translation: res[0].translation_text });
+                } else if (res && res.length > 0 && res[0].generated_text) {
+                    callback(null, { found: true, translation: res[0].generated_text });
+                } else {
+                    callback(null, { found: false });
+                }
+
             } catch (e) {
-                callback(null, { found: false, message: '模型代理队列异常: ' + e.message });
+                console.error('[Helsinki] Inference error:', e);
+                callback(null, { found: false, message: '模型推理异常: ' + e.message });
             }
         })();
     }
