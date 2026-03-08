@@ -5,6 +5,9 @@
  */
 const { createEcdictBackend } = require('./backends/ecdict.js');
 const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
+const CommandManager = require('./commands/index.js');
+
+let lastWordToSearch = '';
 
 // 默认配置
 let appConfig = {
@@ -169,6 +172,13 @@ if (typeof window !== 'undefined') {
           }
           const w = searchWord.trim();
 
+          if (w.startsWith('/')) {
+            CommandManager.handleSearch(w, callbackSetList);
+            return;
+          }
+
+          lastWordToSearch = w;
+
           searchTimeout = setTimeout(() => {
             callbackSetList([
               { title: '⏳ 正在翻译中...', description: '调用本地大模型，可能需要数秒钟，请稍候...' }
@@ -191,6 +201,36 @@ if (typeof window !== 'undefined') {
         select: function (action, itemData, callbackSetList) {
           // 如果用户点击的是耗时统计条目，不进行任何动作
           if (itemData.title && itemData.title.startsWith('⚡ 本地翻译耗时')) {
+            return;
+          }
+
+          if (itemData.isCommandContext) {
+            const signal = CommandManager.handleSelect(itemData, appConfig);
+            if (signal.autoComplete) {
+              if (typeof utools !== 'undefined') {
+                utools.setSubInputValue(signal.autoComplete);
+              }
+            } else {
+              if (signal.reloadBackend) {
+                if (typeof window !== 'undefined' && window.stopLocalWorker) {
+                  window.stopLocalWorker();
+                  window.stopLocalWorker = null;
+                }
+                if (appConfig.backends.helsinki_model) {
+                  backend = createHelsinkiBackend();
+                } else {
+                  backend = createEcdictBackend();
+                }
+                if (typeof window !== 'undefined' && backend && typeof backend.stopWorker === 'function') {
+                  window.stopLocalWorker = backend.stopWorker.bind(backend);
+                }
+              }
+              if (signal.restoreSearch) {
+                if (typeof utools !== 'undefined') {
+                  utools.setSubInputValue(lastWordToSearch || '');
+                }
+              }
+            }
             return;
           }
 
