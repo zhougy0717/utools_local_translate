@@ -1,8 +1,12 @@
 const modeCommand = require('./mode.js');
+const modelCommand = require('./model.js');
+const pathCommand = require('./path.js');
 
 // 注册激活的所有命令
 const COMMANDS = [
-    modeCommand
+    modeCommand,
+    modelCommand,
+    pathCommand
 ];
 
 const CommandManager = {

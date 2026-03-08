@@ -14,7 +14,7 @@ const MODES = [
 module.exports = {
     trigger: 'mode',
     title: '选择模式',
-    description: '切换翻译使用的模型或离线词典',
+    description: '切换翻译使用的模型或离线词典 (/mode)',
 
     handleSearch(subInput, callbackSetList) {
         const items = MODES.map(mode => {
