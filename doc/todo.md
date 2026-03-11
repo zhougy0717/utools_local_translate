@@ -3,12 +3,11 @@
 - [X] 支持本地模型(Helsinki)的AI翻译
 - [x] slash command
 
-# 资源下载
-- [ ] 支持自动下载Helsinki-NLP/opus-mt模型
-
-# 翻译功能
-- [ ] 支持下载HY-MT-1.5B模型
-- [ ] 支持基于HY-MT-1.5B模型翻译
+# 模型翻译
+- [x] 支持ollama API
+- [ ] preload.js重构，不应当感知backend
+- [ ] ollama配置应当整合到模式选择命令中
+- [ ] 支持libre translate
 
 # 词典功能
 - [ ] 前缀联想、模糊匹配（输入时展示多个候选词）。

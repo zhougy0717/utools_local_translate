@@ -5,6 +5,7 @@
  */
 const { createDictBackend } = require('./backends/dict/index.js');
 const { createHelsinkiBackend } = require('./backends/helsinki/helsinki.js');
+const { createOllamaBackend } = require('./backends/ollama/index.js');
 const CommandManager = require('./commands/index.js');
 
 let lastWordToSearch = '';
@@ -14,7 +15,13 @@ let appConfig = {
   resourcePath: '',
   backends: {
     offline_dict: true,
-    helsinki_model: false
+    helsinki_model: false,
+    ollama: false
+  },
+  ollama: {
+    apiBase: 'http://127.0.0.1:11434/v1',
+    model: '',
+    prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。'
   }
 };
 
@@ -31,10 +38,11 @@ const GLOBAL_CONFIG = {
   showTranslationCost: true
 };
 
-// 后端初始化逻辑（简单优先级：Helsinki > ECDict）
-// 这里如果是多选框都选了，目前优先级给大模型
+// 后端初始化逻辑（优先级： Ollama > Helsinki > ECDict）
 let backend;
-if (appConfig.backends.helsinki_model) {
+if (appConfig.backends.ollama) {
+  backend = createOllamaBackend(appConfig.ollama);
+} else if (appConfig.backends.helsinki_model) {
   backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
 } else {
   backend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
@@ -90,7 +98,10 @@ function buildListItems(searchWord, result, isZhToEn, costTime) {
   // 独立追加时延统计项 (根据配置开关决定是否显示)去除了原本拼接到原本字符串中的功能
   if (costTime && GLOBAL_CONFIG.showTranslationCost) {
     const costSeconds = (costTime / 1000).toFixed(2);
-    const modeDesc = appConfig.backends.helsinki_model ? '模型查询时延' : '词典查询时延';
+    let modeDesc = '词典查询时延';
+    if (appConfig.backends.ollama) modeDesc = 'Ollama 查询时延';
+    else if (appConfig.backends.helsinki_model) modeDesc = '模型查询时延';
+
     list.push({
       title: '⚡ 本地翻译耗时: ' + costSeconds + '秒',
       description: modeDesc,
@@ -116,7 +127,13 @@ function applyEnterWithWord(word, callbackSetList) {
   const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
   const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
 
-  const loadingDesc = appConfig.backends.helsinki_model ? '调用本地大模型，可能需要数秒钟，请稍候...' : '正在检索本地词典，请稍候...';
+  let loadingDesc = '正在检索本地词典，请稍候...';
+  if (appConfig.backends.ollama) {
+      loadingDesc = '正在请求 Ollama 服务，请稍候...';
+  } else if (appConfig.backends.helsinki_model) {
+      loadingDesc = '调用本地大模型，可能需要数秒钟，请稍候...';
+  }
+
   callbackSetList([
     { title: '⏳ 正在检索中...', description: loadingDesc }
   ]);
@@ -149,6 +166,10 @@ if (typeof window !== 'undefined') {
           if (configContainer) {
             configContainer.style.display = 'none';
           }
+          const ollamaConfigContainer = document.getElementById('ollama-config-container');
+          if (ollamaConfigContainer) {
+            ollamaConfigContainer.style.display = 'none';
+          }
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
             action && action.type === 'over' && typeof action.payload === 'string'
@@ -169,6 +190,20 @@ if (typeof window !== 'undefined') {
             searchTimeout = null;
           }
 
+          const configContainer = document.getElementById('config-container');
+          if (configContainer && configContainer.style.display !== 'none') {
+            configContainer.style.display = 'none';
+          }
+          const ollamaConfigContainer = document.getElementById('ollama-config-container');
+          if (ollamaConfigContainer && ollamaConfigContainer.style.display !== 'none') {
+            // hide it automatically if user continues typing a word
+            if (typeof window.hideOllamaConfig === 'function') {
+                window.hideOllamaConfig();
+            } else {
+                ollamaConfigContainer.style.display = 'none';
+            }
+          }
+
           if (!searchWord || !searchWord.trim()) {
             callbackSetList([]);
             return;
@@ -183,7 +218,13 @@ if (typeof window !== 'undefined') {
           lastWordToSearch = w;
 
           searchTimeout = setTimeout(() => {
-            const loadingDesc = appConfig.backends.helsinki_model ? '调用本地大模型，可能需要数秒钟，请稍候...' : '正在检索本地词典，请稍候...';
+            let loadingDesc = '正在检索本地词典，请稍候...';
+            if (appConfig.backends.ollama) {
+                loadingDesc = '正在请求 Ollama 服务，请稍候...';
+            } else if (appConfig.backends.helsinki_model) {
+                loadingDesc = '调用本地大模型，可能需要数秒钟，请稍候...';
+            }
+
             callbackSetList([
               { title: '⏳ 正在检索中...', description: loadingDesc }
             ]);
@@ -212,6 +253,72 @@ if (typeof window !== 'undefined') {
 
           if (itemData.isCommandContext) {
             const signal = CommandManager.handleSelect(itemData, appConfig, callbackSetList);
+
+            if (signal.openOllamaConfigPanel) {
+              if (typeof utools !== 'undefined') {
+                utools.setExpendHeight(600);
+              }
+              let iframeContainer = document.getElementById('ollama-config-container');
+              if (!iframeContainer) {
+                iframeContainer = document.createElement('div');
+                iframeContainer.id = 'ollama-config-container';
+                iframeContainer.style.position = 'fixed';
+                iframeContainer.style.top = '0';
+                iframeContainer.style.left = '0';
+                iframeContainer.style.width = '100vw';
+                iframeContainer.style.height = '100vh';
+                iframeContainer.style.zIndex = '999999';
+                iframeContainer.style.backgroundColor = '#f7f8f9';
+                
+                const iframe = document.createElement('iframe');
+                const path = require('path');
+                let normalizedPath = path.join(__dirname, 'config', 'ollama.html').replace(/\\/g, '/');
+                if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+                iframe.src = 'file://' + normalizedPath;
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.border = 'none';
+                iframe.style.display = 'block';
+                iframeContainer.appendChild(iframe);
+                document.body.appendChild(iframeContainer);
+              }
+              iframeContainer.style.display = 'block';
+
+              // 暴露给 iframe 内部调用以关闭界面的方法，并在关闭时通知重载模型
+              window.hideOllamaConfig = function() {
+                if (iframeContainer) iframeContainer.style.display = 'none';
+                
+                // 配置可能有修改，读取最新配置并重启 backend
+                if (typeof utools !== 'undefined') {
+                  const storedConfig = utools.dbStorage.getItem('app_config');
+                  if (storedConfig) appConfig = storedConfig;
+                }
+                
+                if (window.stopLocalWorker) {
+                    window.stopLocalWorker();
+                    window.stopLocalWorker = null;
+                }
+                
+                if (appConfig.backends.ollama) {
+                  backend = createOllamaBackend(appConfig.ollama);
+                } else if (appConfig.backends.helsinki_model) {
+                  backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
+                } else {
+                  backend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
+                }
+                
+                if (backend && typeof backend.stopWorker === 'function') {
+                  window.stopLocalWorker = backend.stopWorker.bind(backend);
+                }
+                
+                if (typeof utools !== 'undefined') {
+                    utools.setSubInputValue('');
+                }
+              };
+              
+              return;
+            }
+
             if (signal.autoComplete) {
               if (typeof utools !== 'undefined') {
                 utools.setSubInputValue(signal.autoComplete);
@@ -222,7 +329,9 @@ if (typeof window !== 'undefined') {
                   window.stopLocalWorker();
                   window.stopLocalWorker = null;
                 }
-                if (appConfig.backends.helsinki_model) {
+                if (appConfig.backends.ollama) {
+                  backend = createOllamaBackend(appConfig.ollama);
+                } else if (appConfig.backends.helsinki_model) {
                   backend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
                 } else {
                   backend = createDictBackend({ dictRepoPath: appConfig.resourcePath });

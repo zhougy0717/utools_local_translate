@@ -1,0 +1,7 @@
+node_modules/
+resources/
+temp_output.txt
+.nyc_output/
+coverage/
+logs/
+*.log

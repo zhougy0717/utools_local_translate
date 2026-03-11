@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Local Translate</title>
+</head>
+
+<body>
+  <script>
+    if (typeof utools !== 'undefined') {
+      utools.onPluginEnter(({ code, type, payload }) => {
+        if (code === 'settings') {
+          // 初始化配置页容器
+          let configContainer = document.getElementById('config-container');
+          if (!configContainer) {
+            configContainer = document.createElement('div');
+            configContainer.id = 'config-container';
+            configContainer.style.position = 'absolute';
+            configContainer.style.top = '0';
+            configContainer.style.left = '0';
+            configContainer.style.width = '100vw';
+            configContainer.style.height = '100vh';
+            configContainer.style.zIndex = '999999'; // 确保在最上层
+            configContainer.style.backgroundColor = '#fff';
+
+            const iframe = document.createElement('iframe');
+            iframe.src = './config/index.html';
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.display = 'block';
+            configContainer.appendChild(iframe);
+            document.body.appendChild(configContainer);
+          }
+          configContainer.style.display = 'block';
+          utools.setExpendHeight(600); // 展开足够的高度展示设置页
+        } else {
+          // 进入非设置页（例如 dict）时，隐藏设置页容器，交由 uTools 接管界面
+          const configContainer = document.getElementById('config-container');
+          if (configContainer) {
+            configContainer.style.display = 'none';
+          }
+        }
+      });
+
+      utools.onPluginOut(() => {
+        if (typeof window.stopLocalWorker === 'function') {
+          window.stopLocalWorker();
+        }
+      });
+    }
+  </script>
+</body>
+
+</html>
