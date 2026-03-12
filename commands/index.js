@@ -1,14 +1,12 @@
 const modeCommand = require('./mode.js');
 const modelCommand = require('./model.js');
 const pathCommand = require('./path.js');
-const ollamaCommand = require('./ollama.js');
 
 // 注册激活的所有命令
 const COMMANDS = [
     modeCommand,
     modelCommand,
-    pathCommand,
-    ollamaCommand
+    pathCommand
 ];
 
 const CommandManager = {
@@ -55,6 +53,10 @@ const CommandManager = {
 
         // 将具体的二级菜单选中转发给特定的命令模块处理
         const trigger = itemData.commandTrigger;
+        if (trigger === 'ollama') {
+            // 兼容旧版本的遗留回调信号
+            return { openOllamaConfigPanel: true, disableClear: true };
+        }
         const cmd = COMMANDS.find(c => c.trigger === trigger);
         if (cmd) {
             return cmd.handleSelect(itemData, appConfig, callbackSetList);

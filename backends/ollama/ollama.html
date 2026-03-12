@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama 配置</title>
+    <style>
+        body {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f7f8f9;
+            color: #333333;
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        .config-card {
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid #eaeaea;
+            align-self: flex-start;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        h2 {
+            margin: 0;
+            font-size: 22px;
+            font-weight: 600;
+            color: #111111;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #555555;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px 12px;
+            background: #fafafa;
+            border: 1px solid #dcdcdc;
+            border-radius: 6px;
+            color: #333333;
+            box-sizing: border-box;
+            font-size: 14px;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            font-family: inherit;
+        }
+
+        input[type="text"]:focus,
+        select:focus,
+        textarea:focus {
+            border-color: #2563eb;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .input-with-action {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .input-with-action select {
+            flex-grow: 1;
+        }
+
+        .btn-icon {
+            background: #ffffff;
+            border: 1px solid #dcdcdc;
+            color: #333333;
+            padding: 0 15px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+            transition: background 0.2s;
+        }
+
+        .btn-icon:hover {
+            background: #f0f0f0;
+        }
+        
+        .btn-icon:active {
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 100px;
+            font-family: monospace;
+            line-height: 1.5;
+            color: #444;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+            background: #2563eb;
+            border: none;
+            border-radius: 6px;
+            color: #ffffff;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 15px;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+            transition: transform 0.1s, box-shadow 0.2s, background 0.2s;
+            margin-top: 10px;
+        }
+
+        .btn-primary:hover {
+            background: #1d4ed8;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+
+        .btn-primary:active {
+            transform: translateY(1px);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        }
+        
+        #status-message {
+            margin-top: 15px;
+            font-size: 13px;
+            text-align: center;
+            min-height: 20px;
+        }
+        
+        .status-success {
+            color: #16a34a;
+        }
+        
+        .status-error {
+            color: #dc2626;
+        }
+        
+        /* Loading animation for refresh button */
+        .rotating {
+            animation: rotate 1s linear infinite;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+
+<div class="config-card">
+    <header>
+        <h2>Ollama 配置</h2>
+        <button id="btn-close" class="btn-icon" style="padding: 6px 12px; font-size: 13px;">关闭面板</button>
+    </header>
+    
+    <div class="form-group">
+        <label for="apiBase">API Base URL</label>
+        <input type="text" id="apiBase" placeholder="http://127.0.0.1:11434/v1">
+    </div>
+
+    <div class="form-group">
+        <label for="modelSelect">Model Name <span style="font-weight: normal; color: #888; font-size: 11px;">(需先启动 Ollama)</span></label>
+        <div class="input-with-action">
+            <select id="modelSelect">
+                <option value="" disabled selected>-- 请选择模型或点击刷新 --</option>
+            </select>
+            <button id="btn-refresh-models" class="btn-icon" title="拉取本地模型">🔄</button>
+        </div>
+    </div>
+
+    <div class="form-group">
+        <label for="prompt">System Prompt</label>
+        <textarea id="prompt"></textarea>
+    </div>
+
+    <button id="btn-save" class="btn-primary">保存配置</button>
+    <div id="status-message"></div>
+</div>
+
+<script src="./ollama-renderer.js"></script>
+</body>
+</html>

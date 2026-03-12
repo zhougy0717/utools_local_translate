@@ -4,7 +4,7 @@
  */
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const { isLikelyChinese } = require('../preload.js');
+const { isLikelyChinese } = require('../src/utils/utools_helper');
 
 describe('isLikelyChinese', function () {
   it('纯英文返回 false', function () {

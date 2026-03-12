@@ -1,10 +1,11 @@
+const path = require('path');
+
 /**
  * Ollama API 翻译后端驱动
  * 实现 OpenAI 兼容格式的请求调用
  */
 class OllamaBackend {
     constructor(config = {}) {
-        // 配置合并，确保有默认值
         this.config = {
             apiBase: config.apiBase || 'http://127.0.0.1:11434/v1',
             apiKey: config.apiKey || 'ollama',
@@ -116,6 +117,66 @@ class OllamaBackend {
             this.currentAbortController.abort();
             this.currentAbortController = null;
         }
+    }
+
+    /**
+     * 挂载并打开自身的 Ollama 配置界面
+     * @param {Function} onCloseCallback 面板关闭后的回调，用于通知主程序进行 reload
+     */
+    openConfigPanel(onCloseCallback) {
+        console.log('[Ollama] Attempting to open config panel');
+        if (typeof document === 'undefined') {
+            console.error('[Ollama] document is undefined, cannot open panel');
+            return;
+        }
+
+        if (typeof utools !== 'undefined') {
+            utools.setExpendHeight(600);
+        }
+
+        let iframeContainer = document.getElementById('ollama-config-container');
+        if (!iframeContainer) {
+            console.log('[Ollama] Creating config iframe container');
+            iframeContainer = document.createElement('div');
+            iframeContainer.id = 'ollama-config-container';
+            iframeContainer.style.position = 'fixed';
+            iframeContainer.style.top = '0';
+            iframeContainer.style.left = '0';
+            iframeContainer.style.width = '100vw';
+            iframeContainer.style.height = '100vh';
+            iframeContainer.style.zIndex = '999999';
+            iframeContainer.style.backgroundColor = '#f7f8f9';
+            
+            const iframe = document.createElement('iframe');
+            
+            // 使用更健壮的路径计算
+            const htmlPath = path.resolve(__dirname, 'ollama.html');
+            let normalizedPath = htmlPath.replace(/\\/g, '/');
+            if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+            
+            const finalUrl = 'file://' + normalizedPath;
+            console.log('[Ollama] Iframe URL:', finalUrl);
+            
+            iframe.src = finalUrl;
+            iframe.style.width = '100%';
+            iframe.style.height = '100%';
+            iframe.style.border = 'none';
+            iframe.style.display = 'block';
+            iframeContainer.appendChild(iframe);
+            document.body.appendChild(iframeContainer);
+        }
+        
+        console.log('[Ollama] Showing container');
+        iframeContainer.style.display = 'block';
+
+        // 暴露给 iframe 内部调用的关闭方法
+        window.hideOllamaConfig = function() {
+            console.log('[Ollama] Hiding container');
+            if (iframeContainer) iframeContainer.style.display = 'none';
+            if (typeof onCloseCallback === 'function') {
+                onCloseCallback();
+            }
+        };
     }
 }
 
