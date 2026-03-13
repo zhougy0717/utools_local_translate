@@ -39,7 +39,7 @@ esbuild.build({
         'import.meta.url': "'file:///C:/dummy'"
     },
     external: [
-        'fs', 'path', 'zlib', 'tar'
+        'fs', 'path', 'zlib', 'tar', 'https-proxy-agent', 'node-fetch'
     ]
 }).then(() => {
     console.log('Build complete: backends/helsinki/helsinki.js');

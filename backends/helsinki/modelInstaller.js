@@ -23,8 +23,13 @@ const MODEL_IDS = [
  *   - speed: 当前下载速度（B/s）
  * @returns {Promise<void>}
  */
-async function installModels(destDir, onProgress) {
-    const downloader = new ModelDownloader(MIRROR_ENDPOINT);
+async function installModels(destDir, proxy = '', onProgress = null) {
+    if (typeof proxy === 'function') {
+        onProgress = proxy;
+        proxy = '';
+    }
+
+    const downloader = new ModelDownloader(MIRROR_ENDPOINT, proxy);
     const modelRoot = path.join(destDir, 'helsinki_models');
 
     for (const modelId of MODEL_IDS) {

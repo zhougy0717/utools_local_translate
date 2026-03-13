@@ -3,6 +3,8 @@ const path = require('node:path');
 const fsPromises = require('node:fs/promises');
 const fs = require('node:fs');
 const { pipeline } = require('node:stream/promises');
+const { HttpsProxyAgent } = require('https-proxy-agent');
+const nodeFetch = require('node-fetch');
 
 // Import the FileManager tools created before
 const fileManager = require('./fileManager');
@@ -35,13 +37,33 @@ class ModelDownloader {
 
     /**
      * @param {string} endpoint The Hugging Face Mirror endpoint
+     * @param {string} proxy The proxy server URL
      */
-    constructor(endpoint) {
+    constructor(endpoint, proxy = '') {
         this.endpoint = endpoint;
+        this.proxy = proxy;
         // Enforce the endpoint for internal HF calls indirectly by env as a fallback
         if (endpoint) {
             process.env.HF_ENDPOINT = endpoint;
         }
+    }
+
+    /**
+     * Returns a fetch implementation that supports proxy if configured
+     */
+    getFetch() {
+        if (!this.proxy) {
+            return global.fetch || nodeFetch;
+        }
+
+        const agent = new HttpsProxyAgent(this.proxy);
+        // Create a wrapper that injects the agent
+        return (url, options = {}) => {
+            return nodeFetch(url, {
+                ...options,
+                agent: agent
+            });
+        };
     }
 
     /**
@@ -56,7 +78,8 @@ class ModelDownloader {
             for await (const fileInfo of huggingfaceHub.listFiles({
                 repo: { type: 'model', name: modelId },
                 hubUrl: this.endpoint,
-                recursive: true
+                recursive: true,
+                fetch: this.getFetch()
             })) {
                 if (checkMatch(fileInfo.path)) {
                     files.push(fileInfo);
@@ -123,7 +146,8 @@ class ModelDownloader {
             const downloadResponse = await huggingfaceHub.downloadFile({
                 repo: { type: 'model', name: modelId },
                 path: fileInfo.path,
-                hubUrl: this.endpoint // enforce hubURL
+                hubUrl: this.endpoint, // enforce hubURL
+                fetch: this.getFetch()
             });
 
             if (!downloadResponse.ok) {

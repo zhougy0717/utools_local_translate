@@ -31,7 +31,10 @@ class BackendManager {
     if (appConfig.backends.ollama) {
       this.activeBackend = createOllamaBackend(appConfig.ollama);
     } else if (appConfig.backends.helsinki_model) {
-      this.activeBackend = createHelsinkiBackend({ modelRepoPath: appConfig.resourcePath });
+      this.activeBackend = createHelsinkiBackend({ 
+        modelRepoPath: appConfig.resourcePath,
+        proxy: appConfig.proxy
+      });
     } else {
       this.activeBackend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
     }

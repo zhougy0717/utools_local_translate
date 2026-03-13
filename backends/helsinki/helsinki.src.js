@@ -58,7 +58,7 @@ function createHelsinkiBackend(options) {
         }
 
         try {
-            await installModels(modelDir, (prog) => {
+            await installModels(modelDir, options.proxy || '', (prog) => {
                 if (onDownloadProgress) {
                     const pct = prog.total > 0
                         ? Math.round((prog.downloaded / prog.total) * 100)

@@ -32055,6 +32055,8 @@ var require_modelDownloader = __commonJS({
     var fsPromises = require("node:fs/promises");
     var fs3 = require("node:fs");
     var { pipeline: pipeline2 } = require("node:stream/promises");
+    var { HttpsProxyAgent } = require("https-proxy-agent");
+    var nodeFetch = require("node-fetch");
     var fileManager = require_fileManager();
     var ALLOWED_PATTERNS = [
       "config.json",
@@ -32078,12 +32080,29 @@ var require_modelDownloader = __commonJS({
     var ModelDownloader = class {
       /**
        * @param {string} endpoint The Hugging Face Mirror endpoint
+       * @param {string} proxy The proxy server URL
        */
-      constructor(endpoint) {
+      constructor(endpoint, proxy = "") {
         this.endpoint = endpoint;
+        this.proxy = proxy;
         if (endpoint) {
           process.env.HF_ENDPOINT = endpoint;
         }
+      }
+      /**
+       * Returns a fetch implementation that supports proxy if configured
+       */
+      getFetch() {
+        if (!this.proxy) {
+          return global.fetch || nodeFetch;
+        }
+        const agent = new HttpsProxyAgent(this.proxy);
+        return (url2, options = {}) => {
+          return nodeFetch(url2, {
+            ...options,
+            agent
+          });
+        };
       }
       /**
        * @param {string} modelId 
@@ -32096,7 +32115,8 @@ var require_modelDownloader = __commonJS({
           for await (const fileInfo of huggingfaceHub.listFiles({
             repo: { type: "model", name: modelId },
             hubUrl: this.endpoint,
-            recursive: true
+            recursive: true,
+            fetch: this.getFetch()
           })) {
             if (checkMatch(fileInfo.path)) {
               files.push(fileInfo);
@@ -32147,8 +32167,9 @@ var require_modelDownloader = __commonJS({
           const downloadResponse = await huggingfaceHub.downloadFile({
             repo: { type: "model", name: modelId },
             path: fileInfo.path,
-            hubUrl: this.endpoint
+            hubUrl: this.endpoint,
             // enforce hubURL
+            fetch: this.getFetch()
           });
           if (!downloadResponse.ok) {
             throw new Error(`Failed to fetch file ${fileInfo.path} from HF API, status: ${downloadResponse.statusText}`);
@@ -32183,8 +32204,12 @@ var require_modelInstaller = __commonJS({
       "Xenova/opus-mt-zh-en",
       "Xenova/opus-mt-en-zh"
     ];
-    async function installModels2(destDir, onProgress) {
-      const downloader = new ModelDownloader(MIRROR_ENDPOINT);
+    async function installModels2(destDir, proxy = "", onProgress = null) {
+      if (typeof proxy === "function") {
+        onProgress = proxy;
+        proxy = "";
+      }
+      const downloader = new ModelDownloader(MIRROR_ENDPOINT, proxy);
       const modelRoot = path4.join(destDir, "helsinki_models");
       for (const modelId of MODEL_IDS) {
         const shortName = modelId.split("/")[1];
@@ -32247,7 +32272,7 @@ function createHelsinkiBackend(options) {
       return { ok: true };
     }
     try {
-      await installModels(modelDir, (prog) => {
+      await installModels(modelDir, options.proxy || "", (prog) => {
         if (onDownloadProgress) {
           const pct = prog.total > 0 ? Math.round(prog.downloaded / prog.total * 100) : 0;
           const speedKB = Math.round(prog.speed / 1024);
