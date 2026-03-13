@@ -1,5 +1,4 @@
 const { createDictBackend } = require('../../backends/dict/index.js');
-const { createHelsinkiBackend } = require('../../backends/helsinki/helsinki.js');
 const { createOllamaBackend } = require('../../backends/ollama/index.js');
 
 class BackendManager {
@@ -30,11 +29,6 @@ class BackendManager {
     }
     if (appConfig.backends.ollama) {
       this.activeBackend = createOllamaBackend(appConfig.ollama);
-    } else if (appConfig.backends.helsinki_model) {
-      this.activeBackend = createHelsinkiBackend({ 
-        modelRepoPath: appConfig.resourcePath,
-        proxy: appConfig.proxy
-      });
     } else {
       this.activeBackend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
     }
@@ -47,8 +41,6 @@ class BackendManager {
   getLoadingMessage() {
     if (this.currentConfig.backends.ollama) {
       return '正在请求 Ollama 服务，请稍候...';
-    } else if (this.currentConfig.backends.helsinki_model) {
-      return '调用本地大模型，可能需要数秒钟，请稍候...';
     }
     return '正在检索本地词典，请稍候...';
   }
@@ -59,7 +51,6 @@ class BackendManager {
    */
   getBackendName() {
     if (this.currentConfig.backends.ollama) return 'Ollama 查询时延';
-    if (this.currentConfig.backends.helsinki_model) return '模型查询时延';
     return '词典查询时延';
   }
 

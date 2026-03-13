@@ -1,8 +1,0 @@
-{
-    "endpoint": "https://hf-mirror.com",
-    "targetAbsolutePath": "c:/Users/Banny/code/local_translate/resources/helsinki-models/helsinki_models",
-    "models": [
-        "Xenova/opus-mt-zh-en",
-        "Xenova/opus-mt-en-zh"
-    ]
-}

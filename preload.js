@@ -16,7 +16,6 @@ let appConfig = {
   proxy: '',
   backends: {
     offline_dict: true,
-    helsinki_model: false,
     ollama: false
   },
   ollama: {

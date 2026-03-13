@@ -149,7 +149,6 @@ function saveConfig() {
     // 如果没有配置过后端偏好，默认在这里也切到 ollama
     if(!config.backends) config.backends = {};
     config.backends.ollama = true;
-    config.backends.helsinki_model = false;
     config.backends.offline_dict = false;
 
     utools.dbStorage.setItem('app_config', config);

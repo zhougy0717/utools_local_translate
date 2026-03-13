@@ -21,7 +21,7 @@ RESOURCE_DB_NAMES = ("ecdict.db", "cccedict.db")
 EXCLUDE_DIRS = {".vscode", ".cursor", "node_modules", "ECDICT"}
 
 # 排除的文件/目录（相对根目录的任意路径中包含这些即排除）
-EXCLUDE_ANY = {".git", "helsinki-models", "helsinki-opus-en-zh.tar.gz"}
+EXCLUDE_ANY = {".git"}
 
 # resources 下不打包已解压的词典（只打包 .gz）
 EXCLUDE_RESOURCE_DB = {"ecdict.db", "cccedict.db"}

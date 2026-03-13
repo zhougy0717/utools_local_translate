@@ -1,24 +1,13 @@
 {
-  "name": "本地翻译",
+  "name": "local-translate",
   "version": "0.1.0",
   "description": "uTools 本地词典查词插件",
   "type": "commonjs",
   "private": true,
   "scripts": {
-    "test": "node --test test/",
-    "build:backend": "node scripts/build_helsinki.js"
+    "test": "node --test test/"
   },
   "dependencies": {
-    "@huggingface/hub": "^0.15.0",
-    "@xenova/transformers": "^2.17.2",
-    "adm-zip": "^0.5.16",
-    "cli-progress": "^3.12.0",
-    "https-proxy-agent": "^5.0.1",
-    "node-fetch": "^2.7.0",
-    "sql.js": "^1.10.0",
-    "tar": "^7.5.9"
-  },
-  "devDependencies": {
-    "esbuild": "^0.27.3"
+    "sql.js": "^1.10.0"
   }
 }
