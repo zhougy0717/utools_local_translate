@@ -13,8 +13,8 @@ module.exports = {
 
         callbackSetList([
             {
-                title: '打开 Ollama 设置面板',
-                description: `${statusText}。点击此项或回车打开可视化配置面板。`,
+                title: `${statusText}。点击此项或回车打开可视化配置面板。`,
+                description: '打开 Ollama 设置面板',
                 isCommandContext: true,
                 commandTrigger: 'ollama',
                 actionType: 'open_panel'

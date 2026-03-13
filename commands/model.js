@@ -24,8 +24,8 @@ module.exports = {
     handleSearch(subInput, callbackSetList) {
         const items = MODELS.map(model => {
             return {
-                title: model.title,
-                description: model.description,
+                title: model.description,
+                description: model.title,
                 isCommandContext: true,
                 commandTrigger: 'model', // 标记给 index.js 路由回传
                 modelId: model.id

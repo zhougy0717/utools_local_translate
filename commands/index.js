@@ -31,8 +31,8 @@ const CommandManager = {
 
         if (matchedCommands.length > 0) {
             const listItems = matchedCommands.map(cmd => ({
-                title: cmd.title,
-                description: cmd.description,
+                title: cmd.description,
+                description: cmd.title,
                 isCommandContext: true,
                 trigger: cmd.trigger,
                 isRootCommand: true

@@ -32,8 +32,8 @@ module.exports = {
                 : opt.description;
 
             return {
-                title: opt.title,
-                description: dynamicDesc,
+                title: dynamicDesc,
+                description: opt.title,
                 isCommandContext: true,
                 commandTrigger: 'path', // 标记给 index.js 路由回传
                 pathAction: opt.id

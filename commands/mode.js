@@ -100,8 +100,8 @@ module.exports = {
             }
 
             return {
-                title: mode.title,
-                description: `${mode.description} ${statusText}`,
+                title: `${mode.description} ${statusText}`,
+                description: mode.title,
                 isCommandContext: true,
                 commandTrigger: 'mode', // 标记给 index.js 路由回传
                 modeId: mode.id,
