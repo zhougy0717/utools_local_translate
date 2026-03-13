@@ -14,6 +14,17 @@ class BackendManager {
    */
   init(appConfig) {
     this.currentConfig = appConfig;
+
+    // 应用代理设置
+    if (appConfig.proxy) {
+      console.log(`[BackendManager] Applying proxy: ${appConfig.proxy}`);
+      process.env.HTTP_PROXY = appConfig.proxy;
+      process.env.HTTPS_PROXY = appConfig.proxy;
+    } else {
+      delete process.env.HTTP_PROXY;
+      delete process.env.HTTPS_PROXY;
+    }
+
     if (!appConfig.backends) {
        appConfig.backends = { offline_dict: true }; // 降级处理
     }

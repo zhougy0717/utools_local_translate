@@ -13,6 +13,7 @@ let lastWordToSearch = '';
 // 默认配置
 let appConfig = {
   resourcePath: '',
+  proxy: '',
   backends: {
     offline_dict: true,
     helsinki_model: false,
