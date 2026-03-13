@@ -14,6 +14,9 @@ class BackendManager {
    */
   init(appConfig) {
     this.currentConfig = appConfig;
+    if (!appConfig.backends) {
+       appConfig.backends = { offline_dict: true }; // 降级处理
+    }
     if (appConfig.backends.ollama) {
       this.activeBackend = createOllamaBackend(appConfig.ollama);
     } else if (appConfig.backends.helsinki_model) {

@@ -109,16 +109,6 @@ module.exports = {
                 extInfo: extInfo
             };
         });
-        
-        // 如果已选或涉及 Ollama，追加配置项
-        items.push({
-            title: 'Ollama 配置',
-            description: '点击打开 Ollama 可视化配置面板',
-            isCommandContext: true,
-            commandTrigger: 'mode',
-            actionType: 'open_ollama_config',
-            icon: ''
-        });
 
         // 如果用户在 /mode 后继续输入，我们可以基于子输入进行简单筛选
         const fuzzyInput = subInput.trim().toLowerCase();
@@ -131,9 +121,6 @@ module.exports = {
     },
 
     handleSelect(itemData, appConfig, callbackSetList) {
-        if (itemData.actionType === 'open_ollama_config') {
-            return { openOllamaConfigPanel: true, disableClear: true };
-        }
         if (!itemData.modeId) return {};
 
         const status = itemData.currentStatus;

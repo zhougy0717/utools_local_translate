@@ -171,11 +171,22 @@ class OllamaBackend {
 
         // 暴露给 iframe 内部调用的关闭方法
         window.hideOllamaConfig = function() {
-            console.log('[Ollama] Hiding container');
-            if (iframeContainer) iframeContainer.style.display = 'none';
+            console.log('[Ollama] Removing config container from DOM');
+            if (iframeContainer && iframeContainer.parentNode) {
+                iframeContainer.parentNode.removeChild(iframeContainer);
+            }
+            // 重置高度：在列表模式下设为 0 通常会让 uTools 恢复到自动计算的高度
+            if (typeof utools !== 'undefined') {
+                utools.setExpendHeight(0);
+            }
+            // 尝试恢复焦点（虽然 uTools 子输入框焦点通常由其自身接管，但这样更稳妥）
+            window.focus();
+
             if (typeof onCloseCallback === 'function') {
                 onCloseCallback();
             }
+            // 清理全局方法防止内存泄漏
+            delete window.hideOllamaConfig;
         };
     }
 }

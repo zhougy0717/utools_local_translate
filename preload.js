@@ -34,8 +34,11 @@ const GLOBAL_CONFIG = {
 if (typeof utools !== 'undefined') {
   const storedConfig = utools.dbStorage.getItem('app_config');
   if (storedConfig) {
-    // 深度合并或确保必要字段存在
+    const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
     appConfig = Object.assign({}, appConfig, storedConfig);
+    // 确保 backends 是合并而非覆盖
+    appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
+    
     if (!appConfig.ollama) {
         appConfig.ollama = {
             apiBase: 'http://127.0.0.1:11434/v1',
@@ -162,22 +165,31 @@ if (typeof window !== 'undefined') {
 
             if (signal.openOllamaConfigPanel) {
               console.log('[Preload] Opening Ollama config via BackendManager');
-              // 触发后端自持的配置 UI 并传入关闭重载回调
               BackendManager.openOllamaConfig(() => {
                   console.log('[Preload] Ollama config closed, reloading...');
-                  // 配置可能有修改，读取最新配置并重启 backend
-                  if (typeof utools !== 'undefined') {
-                    const storedConfig = utools.dbStorage.getItem('app_config');
-                    if (storedConfig) {
-                        appConfig = Object.assign({}, appConfig, storedConfig);
-                        console.log('[Preload] Updated appConfig:', appConfig);
-                    }
-                  }
-                  
-                  BackendManager.reload(appConfig);
-                  
-                  if (typeof utools !== 'undefined') {
-                      utools.setSubInputValue('');
+                  try {
+                      // 配置可能有修改，读取最新配置并重启 backend
+                      if (typeof utools !== 'undefined') {
+                        const storedConfig = utools.dbStorage.getItem('app_config');
+                        if (storedConfig) {
+                            // 深度合并 backends 避免丢失其他后端的开启状态
+                            const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
+                            appConfig = Object.assign({}, appConfig, storedConfig);
+                            appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
+                            console.log('[Preload] Updated appConfig:', appConfig);
+                        }
+                      }
+                      
+                      BackendManager.reload(appConfig);
+                      
+                      if (typeof utools !== 'undefined') {
+                          // 给 uTools 渲染管线留一个 tick，避免输入框清理后的 focus 抢占由于 iframe 移除引起的 DOM 变动卡顿
+                          setTimeout(() => {
+                            utools.setSubInputValue('');
+                          }, 10);
+                      }
+                  } catch (e) {
+                      console.error('[Preload] Error in Ollama config callback:', e);
                   }
               });
               return;
