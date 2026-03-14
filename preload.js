@@ -16,12 +16,17 @@ let appConfig = {
   proxy: '',
   backends: {
     offline_dict: true,
-    ollama: false
+    ollama: false,
+    libretranslate: false
   },
   ollama: {
     apiBase: 'http://127.0.0.1:11434/v1',
     model: '',
     prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。'
+  },
+  libretranslate: {
+    apiBase: '',
+    apiKey: ''
   }
 };
 
@@ -44,6 +49,12 @@ if (typeof utools !== 'undefined') {
             apiBase: 'http://127.0.0.1:11434/v1',
             model: '',
             prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。'
+        };
+    }
+    if (!appConfig.libretranslate) {
+        appConfig.libretranslate = {
+            apiBase: '',
+            apiKey: ''
         };
     }
   }
@@ -160,55 +171,54 @@ if (typeof window !== 'undefined') {
           }
 
           if (itemData.isCommandContext) {
-            const signal = CommandManager.handleSelect(itemData, appConfig, callbackSetList);
-            console.log('[Preload] Command signal:', signal);
+            Promise.resolve(CommandManager.handleSelect(itemData, appConfig, callbackSetList)).then(signal => {
+              if (!signal) return;
+              console.log('[Preload] Command signal resolved:', signal);
 
-            if (signal.openOllamaConfigPanel) {
-              console.log('[Preload] Opening Ollama config via BackendManager');
-              BackendManager.openOllamaConfig(() => {
-                  console.log('[Preload] Ollama config closed, reloading...');
-                  try {
-                      // 配置可能有修改，读取最新配置并重启 backend
-                      if (typeof utools !== 'undefined') {
-                        const storedConfig = utools.dbStorage.getItem('app_config');
-                        if (storedConfig) {
-                            // 深度合并 backends 避免丢失其他后端的开启状态
-                            const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
-                            appConfig = Object.assign({}, appConfig, storedConfig);
-                            appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
-                            console.log('[Preload] Updated appConfig:', appConfig);
+              if (signal.openOllamaConfigPanel) {
+                console.log('[Preload] Opening Ollama config via BackendManager');
+                BackendManager.openOllamaConfig(() => {
+                    console.log('[Preload] Ollama config closed, reloading...');
+                    try {
+                        if (typeof utools !== 'undefined') {
+                          const storedConfig = utools.dbStorage.getItem('app_config');
+                          if (storedConfig) {
+                              const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
+                              appConfig = Object.assign({}, appConfig, storedConfig);
+                              appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
+                              console.log('[Preload] Updated appConfig:', appConfig);
+                          }
                         }
-                      }
-                      
-                      BackendManager.reload(appConfig);
-                      
-                      if (typeof utools !== 'undefined') {
-                          // 给 uTools 渲染管线留一个 tick，避免输入框清理后的 focus 抢占由于 iframe 移除引起的 DOM 变动卡顿
-                          setTimeout(() => {
-                            utools.setSubInputValue('');
-                          }, 10);
-                      }
-                  } catch (e) {
-                      console.error('[Preload] Error in Ollama config callback:', e);
-                  }
-              });
-              return;
-            }
+                        
+                        BackendManager.reload(appConfig);
+                        
+                        if (typeof utools !== 'undefined') {
+                            setTimeout(() => {
+                              utools.setSubInputValue('');
+                            }, 10);
+                        }
+                    } catch (e) {
+                        console.error('[Preload] Error in Ollama config callback:', e);
+                    }
+                });
+                return;
+              }
 
-            if (signal.autoComplete) {
-              if (typeof utools !== 'undefined') {
-                utools.setSubInputValue(signal.autoComplete);
-              }
-            } else {
-              if (signal.reloadBackend) {
-                BackendManager.reload(appConfig);
-              }
-              if (signal.restoreSearch) {
+              if (signal.autoComplete) {
                 if (typeof utools !== 'undefined') {
-                  utools.setSubInputValue(lastWordToSearch || '');
+                  utools.setSubInputValue(signal.autoComplete);
+                }
+              } else {
+                if (signal.reloadBackend) {
+                  BackendManager.reload(appConfig);
+                }
+                if (signal.restoreSearch) {
+                  if (typeof utools !== 'undefined') {
+                    utools.setSubInputValue(lastWordToSearch || '');
+                  }
                 }
               }
-            }
+            });
             return;
           }
 

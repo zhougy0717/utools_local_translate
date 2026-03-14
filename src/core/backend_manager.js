@@ -1,5 +1,6 @@
 const { createDictBackend } = require('../../backends/dict/index.js');
 const { createOllamaBackend } = require('../../backends/ollama/index.js');
+const { createLibreTranslateBackend } = require('../../backends/libretranslate/index.js');
 
 class BackendManager {
   constructor() {
@@ -27,7 +28,10 @@ class BackendManager {
     if (!appConfig.backends) {
        appConfig.backends = { offline_dict: true }; // 降级处理
     }
-    if (appConfig.backends.ollama) {
+    
+    if (appConfig.backends.libretranslate) {
+      this.activeBackend = createLibreTranslateBackend(appConfig.libretranslate);
+    } else if (appConfig.backends.ollama) {
       this.activeBackend = createOllamaBackend(appConfig.ollama);
     } else {
       this.activeBackend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
@@ -39,6 +43,9 @@ class BackendManager {
    * @returns {string} 加载提示
    */
   getLoadingMessage() {
+    if (this.currentConfig.backends.libretranslate) {
+      return '正在请求 LibreTranslate 服务，请稍候...';
+    }
     if (this.currentConfig.backends.ollama) {
       return '正在请求 Ollama 服务，请稍候...';
     }
@@ -50,6 +57,7 @@ class BackendManager {
    * @returns {string}
    */
   getBackendName() {
+    if (this.currentConfig.backends.libretranslate) return 'LibreTranslate 查询时延';
     if (this.currentConfig.backends.ollama) return 'Ollama 查询时延';
     return '词典查询时延';
   }

@@ -11,6 +11,11 @@ const MODES = [
         id: 'ollama',
         title: 'Ollama (LLM)',
         description: '使用 Ollama 或是兼容 OpenAI 格式的 API 进行翻译 (可定制 Prompt)'
+    },
+    {
+        id: 'libretranslate',
+        title: 'LibreTranslate (OSS)',
+        description: '使用开源的 LibreTranslate API 进行翻译 (可私有部署)'
     }
 ];
 
@@ -48,6 +53,15 @@ function getOllamaStatus(appConfig) {
     return { status: STATUS.UNAVAILABLE };
 }
 
+function getLibreStatus(appConfig) {
+    appConfig = appConfig || {};
+    const libreConfig = appConfig.libretranslate || {};
+    if (libreConfig.apiBase) {
+        return { status: STATUS.READY };
+    }
+    return { status: STATUS.UNAVAILABLE };
+}
+
 
 module.exports = {
     trigger: 'mode',
@@ -72,6 +86,12 @@ module.exports = {
                 extInfo = ollamaInfo;
                 if (currentStatus === STATUS.READY) statusText = '(已配置)';
                 else statusText = '(未配置 API)';
+            } else if (mode.id === 'libretranslate') {
+                const libreInfo = getLibreStatus(appConfig);
+                currentStatus = libreInfo.status;
+                extInfo = libreInfo;
+                if (currentStatus === STATUS.READY) statusText = '(已配置)';
+                else statusText = '(未配置地址)';
             }
 
             return {
@@ -112,6 +132,12 @@ module.exports = {
                     { title: 'Ollama 未配置', description: '您需要配置 Ollama 的 API 地址和模型名称才能使用该模式' },
                     { title: '如何配置？', description: '请输入 /ollama 命令进行配置' }
                 ];
+            } else if (itemData.modeId === 'libretranslate') {
+                instructions = [
+                    { title: 'LibreTranslate 未配置', description: '您需要配置 LibreTranslate 的服务器地址才能使用该模式' },
+                    { title: '如何配置？', description: '请输入 /libre 命令进行配置' },
+                    { title: '如何部署本地服务器？', description: '点击前往官网查看部署指南 (https://docs.libretranslate.com/)', isCommandContext: true, commandTrigger: 'mode', action: 'open_libre_docs' }
+                ];
             }
             if (typeof callbackSetList === 'function') {
                 callbackSetList(instructions);
@@ -119,14 +145,27 @@ module.exports = {
             return { disableClear: true }; // 不做任何后端刷新与搜索恢复
         }
 
+        if (itemData.action === 'open_libre_docs') {
+            if (typeof utools !== 'undefined') {
+                utools.shellOpenExternal('https://docs.libretranslate.com/');
+            }
+            return { restoreSearch: true };
+        }
+
         // status === STATUS.READY
         // 变更应用配置
         if (itemData.modeId === 'offline_dict') {
             appConfig.backends.offline_dict = true;
             appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = false;
         } else if (itemData.modeId === 'ollama') {
             appConfig.backends.offline_dict = false;
             appConfig.backends.ollama = true;
+            appConfig.backends.libretranslate = false;
+        } else if (itemData.modeId === 'libretranslate') {
+            appConfig.backends.offline_dict = false;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = true;
         }
 
         // 持久化保存
