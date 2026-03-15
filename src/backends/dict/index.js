@@ -5,9 +5,102 @@
 const path = require('path');
 const fs = require('fs');
 const { DictConfig } = require('./config');
+const { DictDownloader } = require('./downloader');
+const { buildAllDicts } = require('./builder');
+
+// 词典状态枚举
+const DICT_STATUS = {
+  READY: 'READY',                        // 已就绪：词典数据库文件存在且可用
+  UNAVAILABLE: 'UNAVAILABLE',            // 未下载：词典文件完全不存在
+  DOWNLOADING: 'DOWNLOADING',            // 下载中：正在进行下载操作
+  DOWNLOAD_FAILED: 'DOWNLOAD_FAILED',   // 下载失败：下载过程中发生错误
+  DOWNLOADED_UNPROCESSED: 'DOWNLOADED_UNPROCESSED'  // 已下载未处理：压缩包已下载但尚未解压转换
+};
+
+// 下载文件名称
+const ECDICT_ZIP = 'ecdict-sqlite-28.zip';
+const CCCEDICT_ZIP = 'cedict_1_0_ts_utf-8_mdbg.zip';
 
 // 共享配置管理器实例
 let sharedConfigManager = null;
+
+/**
+ * 检测词典状态
+ * @param {Object} appConfig 应用配置
+ * @returns {Object} { status, path, details }
+ */
+function getDictStatus(appConfig) {
+  appConfig = appConfig || {};
+  const repoPath = appConfig.resourcePath || appConfig.dictRepoPath;
+
+  if (!repoPath) {
+    return { status: DICT_STATUS.UNAVAILABLE, path: '', details: { ecdict: false, cccedict: false } };
+  }
+
+  const ecdictDbPath = path.join(repoPath, 'ecdict.db');
+  const cccedictDbPath = path.join(repoPath, 'cccedict.db');
+
+  const ecdictExists = fs.existsSync(ecdictDbPath);
+  const cccedictExists = fs.existsSync(cccedictDbPath);
+
+  const details = {
+    ecdict: ecdictExists,
+    cccedict: cccedictExists
+  };
+
+  if (ecdictExists && cccedictExists) {
+    return { status: DICT_STATUS.READY, path: repoPath, details };
+  }
+
+  // 检查是否有下载中的临时文件（.downloading 后缀）
+  const ecdictTempPath = path.join(repoPath, ECDICT_ZIP + '.downloading');
+  const cccedictTempPath = path.join(repoPath, CCCEDICT_ZIP + '.downloading');
+
+  const ecdictTempExists = fs.existsSync(ecdictTempPath);
+  const cccedictTempExists = fs.existsSync(cccedictTempPath);
+
+  if (ecdictTempExists || cccedictTempExists) {
+    // 有临时文件，表示下载中断，需要断点续传
+    return { status: DICT_STATUS.DOWNLOADING, path: repoPath, details };
+  }
+
+  // 检查是否有下载的压缩包
+  const ecdictZipPath = path.join(repoPath, ECDICT_ZIP);
+  const cccedictZipPath = path.join(repoPath, CCCEDICT_ZIP);
+
+  const ecdictZipExists = fs.existsSync(ecdictZipPath);
+  const cccedictZipExists = fs.existsSync(cccedictZipPath);
+
+  if (ecdictZipExists || cccedictZipExists) {
+    return { status: DICT_STATUS.DOWNLOADED_UNPROCESSED, path: repoPath, details };
+  }
+
+  return { status: DICT_STATUS.UNAVAILABLE, path: repoPath, details };
+}
+
+/**
+ * 下载词典（需要外部传入 proxy 配置）
+ * @param {Object} options 下载选项
+ * @param {string} options.destDir 目标目录
+ * @param {string} [options.proxy] 代理服务器地址
+ * @param {Function} options.onProgress 进度回调
+ * @returns {Promise<Object>} 下载结果
+ */
+async function downloadDicts(options) {
+  const { destDir, proxy, onProgress } = options;
+
+  if (!destDir) {
+    return { success: false, error: new Error('destDir is required') };
+  }
+
+  const downloader = new DictDownloader({
+    destDir,
+    proxy
+  });
+
+  const result = await downloader.downloadAll(onProgress);
+  return result;
+}
 
 function createDictBackend(options) {
   // 如果传入的是 DictConfig 实例，直接使用
@@ -40,7 +133,11 @@ function createDictBackend(options) {
   function queryWithSqlJs(word, callback) {
     try {
       const initSqlJs = require('sql.js');
-      initSqlJs().then(function (SQL) {
+      const wasmPath = path.join(path.dirname(require.resolve('sql.js')), 'sql-wasm.wasm');
+      const wasmBinary = fs.readFileSync(wasmPath);
+      initSqlJs({
+        wasmBinary: wasmBinary
+      }).then(function (SQL) {
         const fileBuffer = fs.readFileSync(dbPath);
         const db = new SQL.Database(fileBuffer);
         const safeWord = word.replace(/'/g, "''");
@@ -85,7 +182,11 @@ function createDictBackend(options) {
   function queryCccedictWithSqlJs(word, callback) {
     try {
       const initSqlJs = require('sql.js');
-      initSqlJs().then(function (SQL) {
+      const wasmPath = path.join(path.dirname(require.resolve('sql.js')), 'sql-wasm.wasm');
+      const wasmBinary = fs.readFileSync(wasmPath);
+      initSqlJs({
+        wasmBinary: wasmBinary
+      }).then(function (SQL) {
         const fileBuffer = fs.readFileSync(cccedictDbPath);
         const db = new SQL.Database(fileBuffer);
         const stmt = db.prepare('SELECT english, pinyin FROM cccedict WHERE simplified = ? OR traditional = ? LIMIT 1');
@@ -204,4 +305,11 @@ function createDictBackend(options) {
   };
 }
 
-module.exports = { createDictBackend };
+// 导出独立函数
+module.exports = {
+  createDictBackend,
+  getDictStatus,
+  downloadDicts,
+  buildAllDicts,
+  DICT_STATUS
+};

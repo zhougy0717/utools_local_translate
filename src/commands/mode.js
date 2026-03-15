@@ -1,6 +1,6 @@
 const fs = require('fs');
-const path = require('path');
-const { OllamaConfig, OLLAMA_DEFAULTS } = require('../backends/ollama/config');
+const { OllamaConfig } = require('../backends/ollama/config');
+const { getDictStatus: getBackendDictStatus, downloadDicts, buildAllDicts, DICT_STATUS } = require('../backends/dict');
 
 const MODES = [
     {
@@ -22,29 +22,23 @@ const MODES = [
 
 const STATUS = {
     READY: 'READY',
-    UNAVAILABLE: 'UNAVAILABLE'
+    UNAVAILABLE: 'UNAVAILABLE',
+    DOWNLOADING: 'DOWNLOADING',
+    DOWNLOADED_UNPROCESSED: 'DOWNLOADED_UNPROCESSED'
 };
 
 function getDictStatus(appConfig) {
-    appConfig = appConfig || {};
-    const repoPath = appConfig.resourcePath;
-    if (!repoPath) {
-        return { status: STATUS.UNAVAILABLE, path: '' };
-    }
-
-    const ecdictDbPath = path.join(repoPath, 'ecdict.db');
-    const cccedictDbPath = path.join(repoPath, 'cccedict.db');
-
-    const eReady = fs.existsSync(ecdictDbPath);
-    const cReady = fs.existsSync(cccedictDbPath);
-
-    if (eReady && cReady) return { status: STATUS.READY, path: repoPath };
-    return { status: STATUS.UNAVAILABLE, path: repoPath };
+    // 使用后端模块的状态检测
+    const dictStatus = getBackendDictStatus(appConfig);
+    // 直接映射 DICT_STATUS 到 STATUS
+    return {
+        status: dictStatus.status,
+        path: dictStatus.path,
+        details: dictStatus.details
+    };
 }
 
-
-
-function getOllamaStatus(appConfig) {
+function getOllamaStatus(_appConfig) {
     // 从 backend_ollama 存储键读取 Ollama 配置
     const configManager = new OllamaConfig();
     const ollamaConfig = configManager.load();
@@ -118,6 +112,38 @@ module.exports = {
     },
 
     handleSelect(itemData, appConfig, callbackSetList) {
+        // 优先处理特定操作（如下载词典）
+        if (itemData.action === 'download_dict' || itemData.action === 'build_dict_retry_clean') {
+            // 如果是清理重试，先删除可能的损坏文件
+            if (itemData.action === 'build_dict_retry_clean') {
+                const repoPath = appConfig.resourcePath;
+                if (repoPath) {
+                    ['ecdict-sqlite-28.zip', 'cedict_1_0_ts_utf-8_mdbg.zip'].forEach(file => {
+                        const p = path.join(repoPath, file);
+                        if (fs.existsSync(p)) {
+                            try { fs.unlinkSync(p); } catch(e) {}
+                        }
+                    });
+                }
+            }
+            // 异步执行下载，立即返回以保持 UI 响应
+            handleDownloadDict(itemData, appConfig, callbackSetList).catch(err => {
+                console.error('Download failed:', err);
+                callbackSetList([{
+                    title: '下载出错',
+                    description: err.message || String(err)
+                }]);
+            });
+            return { disableClear: true };
+        }
+
+        if (itemData.action === 'open_libre_docs') {
+            if (typeof utools !== 'undefined') {
+                utools.shellOpenExternal('https://docs.libretranslate.com/');
+            }
+            return { restoreSearch: true };
+        }
+
         if (!itemData.modeId) return {};
 
         const status = itemData.currentStatus;
@@ -125,10 +151,28 @@ module.exports = {
         if (status === STATUS.UNAVAILABLE) {
             let instructions = [];
             if (itemData.modeId === 'offline_dict') {
-                instructions = [
-                    { title: '缺少词典或未配置路径', description: '您必须在设置中配置词典的绝对路径，且该路径下需要包含 ecdict.db 与 cccedict.db' },
-                    { title: '如何配置目录？', description: '您可以输入 /path 命令或者在设置页中设置资源路径' }
-                ];
+                // 离线词典模式：显示下载选项
+                const hasResourcePath = itemData.extInfo && itemData.extInfo.path;
+
+                if (hasResourcePath) {
+                    // 有资源路径但词典文件不存在：显示下载选项
+                    instructions = [
+                        {
+                            title: '立即下载词典',
+                            description: '点击开始下载 ECDICT 和 CC-CEDICT 词典（约 30MB）',
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'download_dict'
+                        },
+                        { title: '如何手动配置？', description: '您可以在设置中配置词典绝对路径' }
+                    ];
+                } else {
+                    // 没有资源路径：显示配置路径选项
+                    instructions = [
+                        { title: '缺少词典或未配置路径', description: '您必须在设置中配置词典的绝对路径' },
+                        { title: '如何配置目录？', description: '您可以输入 /path 命令或者在设置页中设置资源路径' }
+                    ];
+                }
             } else if (itemData.modeId === 'ollama') {
                 instructions = [
                     { title: 'Ollama 未配置', description: '您需要配置 Ollama 的 API 地址和模型名称才能使用该模式' },
@@ -147,11 +191,108 @@ module.exports = {
             return { disableClear: true }; // 不做任何后端刷新与搜索恢复
         }
 
-        if (itemData.action === 'open_libre_docs') {
-            if (typeof utools !== 'undefined') {
-                utools.shellOpenExternal('https://docs.libretranslate.com/');
+        // 处理下载中断状态（断点续传）
+        if (status === STATUS.DOWNLOADING) {
+            if (itemData.modeId === 'offline_dict') {
+                callbackSetList([{
+                    title: '检测到未完成的下载',
+                    description: '点击继续下载上次中断的文件...',
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'download_dict'
+                }]);
+                return { disableClear: true };
             }
-            return { restoreSearch: true };
+        }
+
+        // 处理已下载未处理状态（自动解压构建）
+        if (status === STATUS.DOWNLOADED_UNPROCESSED) {
+            if (itemData.modeId === 'offline_dict') {
+                // 自动触发解压构建
+                const repoPath = appConfig.resourcePath;
+
+                callbackSetList([{
+                    title: '正在解压和构建词典...',
+                    description: '处理中...',
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'build_dict_progress'
+                }]);
+
+                buildAllDicts({
+                    repoPath: repoPath,
+                    onProgress: (message, percent, phase) => {
+                        const dictName = phase === 'ecdict' ? 'ECDICT' : 'CC-CEDICT';
+                        callbackSetList([{
+                            title: `正在构建 ${dictName}...`,
+                            description: `${message} ${percent}%`,
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'build_dict_progress'
+                        }]);
+                    }
+                }).then(buildResult => {
+                    if (buildResult.success) {
+                        const finalStatus = getDictStatus(appConfig);
+
+                        if (finalStatus.status === STATUS.READY) {
+                            appConfig.backends.offline_dict = true;
+                            appConfig.backends.ollama = false;
+                            appConfig.backends.libretranslate = false;
+
+                            if (typeof utools !== 'undefined') {
+                                utools.dbStorage.setItem('app_config', appConfig);
+                            }
+
+                            callbackSetList([{
+                                title: '词典已就绪',
+                                description: '已切换到离线词典模式',
+                                isCommandContext: true,
+                                commandTrigger: 'mode',
+                                modeId: 'offline_dict'
+                            }]);
+                        } else {
+                            // 构建成功但依然不就绪，可能少了某个库
+                            const details = finalStatus.details || {};
+                            const missing = [];
+                            if (!details.ecdict) missing.push('ECDICT');
+                            if (!details.cccedict) missing.push('CC-CEDICT');
+                            
+                            callbackSetList([{
+                                title: '词典构建不完整',
+                                description: `构建完成，但仍缺少: ${missing.join(', ')}。请点击重新下载。`,
+                                isCommandContext: true,
+                                commandTrigger: 'mode',
+                                action: 'download_dict'
+                            }]);
+                        }
+                    } else {
+                        callbackSetList([{
+                            title: '词典构建失败',
+                            description: `原因: ${buildResult.error ? buildResult.error.message : '解压失败'}。可能是压缩包损坏。`,
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'build_dict_retry_clean'
+                        }, {
+                            title: '尝试重新下载',
+                            description: '删除当前缓存并重新开始下载',
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'build_dict_retry_clean'
+                        }]);
+                    }
+                }).catch(err => {
+                    callbackSetList([{
+                        title: '词典构建出错',
+                        description: err.message || String(err),
+                        isCommandContext: true,
+                        commandTrigger: 'mode',
+                        action: 'build_dict_retry_clean'
+                    }]);
+                });
+
+                return { disableClear: true };
+            }
         }
 
         // status === STATUS.READY
@@ -182,3 +323,226 @@ module.exports = {
         };
     }
 };
+
+/**
+ * 处理词典下载
+ * @param {Object} _itemData 选中项数据（未使用）
+ * @param {Object} appConfig 应用配置
+ * @param {Function} callbackSetList 列表更新回调
+ * @returns {Object} 操作结果
+ */
+async function handleDownloadDict(_itemData, appConfig, callbackSetList) {
+    const repoPath = appConfig.resourcePath;
+
+    if (!repoPath) {
+        callbackSetList([{
+            title: '错误',
+            description: '未配置资源路径，请先使用 /path 命令设置'
+        }]);
+        return { disableClear: true };
+    }
+
+    // 确保目录存在
+    if (!fs.existsSync(repoPath)) {
+        try {
+            fs.mkdirSync(repoPath, { recursive: true });
+        } catch (e) {
+            callbackSetList([{
+                title: '错误',
+                description: '无法创建目录：' + e.message
+            }]);
+            return { disableClear: true };
+        }
+    }
+
+    // 获取代理配置
+    const proxy = appConfig.proxy;
+
+    // 显示下载进度
+    callbackSetList([{
+        title: '正在下载 ECDICT 词典...',
+        description: '准备中...',
+        isCommandContext: true,
+        commandTrigger: 'mode',
+        action: 'download_dict_progress'
+    }]);
+
+    try {
+        // 执行下载
+        const result = await downloadDicts({
+            destDir: repoPath,
+            proxy: proxy,
+            onProgress: (progress, _phase) => {
+                // 实时更新下载进度
+                const percent = progress.percent || 0;
+                const downloaded = formatBytes(progress.downloaded || 0);
+                const total = formatBytes(progress.total || 0);
+                const dictName = progress.dict === 'ecdict' ? 'ECDICT' : 'CC-CEDICT';
+
+                callbackSetList([{
+                    title: `正在下载 ${dictName} 词典...`,
+                    description: `${percent}% | 已下载 ${downloaded}/${total}`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'download_dict_progress'
+                }]);
+            }
+        });
+
+        if (result.success) {
+            // 检查词典状态，判断是否需要解压转换
+            const status = getDictStatus(appConfig);
+
+            if (status.status === DICT_STATUS.DOWNLOADED_UNPROCESSED) {
+                // 已下载但未处理（解压转换），自动执行构建
+                callbackSetList([{
+                    title: '正在解压和构建词典...',
+                    description: '处理中...',
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'build_dict_progress'
+                }]);
+
+                try {
+                    const buildResult = await buildAllDicts({
+                        repoPath: repoPath,
+                        onProgress: (message, percent, phase) => {
+                            const dictName = phase === 'ecdict' ? 'ECDICT' : 'CC-CEDICT';
+                            callbackSetList([{
+                                title: `正在构建 ${dictName}...`,
+                                description: `${message} ${percent}%`,
+                                isCommandContext: true,
+                                commandTrigger: 'mode',
+                                action: 'build_dict_progress'
+                            }]);
+                        }
+                    });
+
+                    if (buildResult.success) {
+                        // 构建成功，检查最终状态
+                        const finalStatus = getDictStatus(appConfig);
+
+                        if (finalStatus.status === DICT_STATUS.READY) {
+                            // 词典已就绪，切换到离线词典模式
+                            appConfig.backends.offline_dict = true;
+                            appConfig.backends.ollama = false;
+                            appConfig.backends.libretranslate = false;
+
+                            if (typeof utools !== 'undefined') {
+                                utools.dbStorage.setItem('app_config', appConfig);
+                            }
+
+                            callbackSetList([{
+                                title: '词典已就绪',
+                                description: '已切换到离线词典模式',
+                                isCommandContext: true,
+                                commandTrigger: 'mode',
+                                modeId: 'offline_dict'
+                            }]);
+
+                            return {
+                                reloadBackend: true,
+                                restoreSearch: true
+                            };
+                        } else {
+                            // 构建后仍不可用
+                            callbackSetList([{
+                                title: '词典构建异常',
+                                description: '构建完成后词典仍不可用，请检查资源目录',
+                                isCommandContext: true,
+                                commandTrigger: 'mode',
+                                action: 'build_dict_error'
+                            }]);
+                            return { disableClear: true };
+                        }
+                    } else {
+                        // 构建失败
+                        callbackSetList([{
+                            title: '词典构建失败',
+                            description: buildResult.error ? buildResult.error.message : '解压或构建数据库失败',
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'build_dict_retry'
+                        }]);
+                        return { disableClear: true };
+                    }
+                } catch (err) {
+                    callbackSetList([{
+                        title: '词典构建出错',
+                        description: err.message || String(err),
+                        isCommandContext: true,
+                        commandTrigger: 'mode',
+                        action: 'build_dict_retry'
+                    }]);
+                    return { disableClear: true };
+                }
+            }
+
+            if (status.status !== DICT_STATUS.READY) {
+                // 状态异常，提示用户
+                callbackSetList([{
+                    title: '词典下载完成但状态异常',
+                    description: `请检查资源目录中是否存在 ecdict.db 和 cccedict.db 文件`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'download_dict_error'
+                }]);
+                return { disableClear: true };
+            }
+
+            // 词典已就绪，切换到离线词典模式
+            appConfig.backends.offline_dict = true;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = false;
+
+            if (typeof utools !== 'undefined') {
+                utools.dbStorage.setItem('app_config', appConfig);
+            }
+
+            callbackSetList([{
+                title: '词典已就绪',
+                description: '已切换到离线词典模式',
+                isCommandContext: true,
+                commandTrigger: 'mode',
+                modeId: 'offline_dict'
+            }]);
+
+            return {
+                reloadBackend: true,
+                restoreSearch: true
+            };
+        } else {
+            // 下载失败
+            callbackSetList([{
+                title: '下载失败',
+                description: result.error ? result.error.message : '未知错误',
+                isCommandContext: true,
+                commandTrigger: 'mode',
+                action: 'download_dict_retry'
+            }]);
+
+            return { disableClear: true };
+        }
+    } catch (err) {
+        callbackSetList([{
+            title: '下载出错',
+            description: err.message || String(err),
+            isCommandContext: true,
+            commandTrigger: 'mode',
+            action: 'download_dict_retry'
+        }]);
+
+        return { disableClear: true };
+    }
+}
+
+/**
+ * 格式化字节数
+ */
+function formatBytes(bytes) {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
