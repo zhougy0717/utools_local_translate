@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { OllamaConfig, OLLAMA_DEFAULTS } = require('../backends/ollama/config');
 
 const MODES = [
     {
@@ -44,8 +45,9 @@ function getDictStatus(appConfig) {
 
 
 function getOllamaStatus(appConfig) {
-    appConfig = appConfig || {};
-    const ollamaConfig = appConfig.ollama || {};
+    // 从 backend_ollama 存储键读取 Ollama 配置
+    const configManager = new OllamaConfig();
+    const ollamaConfig = configManager.load();
     // 基本依赖 apiBase 和 model 两个配置项
     if (ollamaConfig.apiBase && ollamaConfig.model) {
         return { status: STATUS.READY };

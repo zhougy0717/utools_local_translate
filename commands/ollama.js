@@ -1,3 +1,17 @@
+const { OllamaConfig, OLLAMA_DEFAULTS } = require('../backends/ollama/config');
+
+// 获取 Ollama 配置（从独立存储键 backend_ollama）
+function getOllamaConfig() {
+    const configManager = new OllamaConfig();
+    return configManager.load();
+}
+
+// 保存 Ollama 配置
+function saveOllamaConfig(config) {
+    const configManager = new OllamaConfig();
+    configManager.save(config);
+}
+
 module.exports = {
     trigger: 'ollama',
     title: 'Ollama 配置',
@@ -20,10 +34,11 @@ module.exports = {
             }
         ];
 
-        // 显示已配置的服务器
-        const currentApiBase = appConfig.ollama?.apiBase;
-        const currentApiKey = appConfig.ollama?.apiKey;
-        const currentModel = appConfig.ollama?.model;
+        // 从 backend_ollama 存储键读取配置
+        const ollamaConfig = getOllamaConfig();
+        const currentApiBase = ollamaConfig.apiBase || OLLAMA_DEFAULTS.apiBase;
+        const currentApiKey = ollamaConfig.apiKey || OLLAMA_DEFAULTS.apiKey;
+        const currentModel = ollamaConfig.model;
 
         // 无输入时显示当前配置状态和选项
         if (!input && currentApiBase) {
@@ -55,7 +70,7 @@ module.exports = {
             itemsToShow.push(modelItem);
 
             // 添加 Prompt 配置项
-            const currentPrompt = appConfig.ollama?.prompt || '';
+            const currentPrompt = ollamaConfig.prompt || '';
             const promptItem = {
                 title: '配置系统提示词 (Prompt)',
                 description: currentPrompt ? currentPrompt : '点击设置翻译提示词',
@@ -139,6 +154,7 @@ module.exports = {
 
     // 处理列表项选择
     async handleSelect(itemData, appConfig, callbackSetList) {
+        console.log('[Ollama] handleSelect called:', itemData);
         if (!itemData.isCommandContext) return {};
 
         if (itemData.action === 'open_docs') {
@@ -213,10 +229,12 @@ module.exports = {
                 const models = await this._fetchModels(apiBase, apiKey);
 
                 if (models.length > 0) {
+                    // 获取当前模型配置用于标记
+                    const currentOllamaConfig = getOllamaConfig();
                     // 显示模型选择列表
                     const modelItems = models.map(model => ({
                         title: model.name,
-                        description: model.name === appConfig.ollama?.model ? '✓ 当前使用' : '点击选择',
+                        description: model.name === currentOllamaConfig.model ? '✓ 当前使用' : '点击选择',
                         isCommandContext: true,
                         commandTrigger: 'ollama',
                         action: 'select_model',
@@ -265,7 +283,8 @@ module.exports = {
         if (itemData.action === 'select_model_direct') {
             // 从现有配置直接重新选择模型
             const { apiBase, apiKey } = itemData;
-            const currentModel = itemData.model || appConfig.ollama?.model;
+            const ollamaConfig = getOllamaConfig();
+            const currentModel = itemData.model || ollamaConfig.model;
 
             callbackSetList([{
                 title: '正在检测服务器连通性...',
@@ -339,22 +358,27 @@ module.exports = {
         }
 
         if (itemData.action === 'select_model') {
+            console.log('[Ollama] select_model action triggered');
             const { apiBase, apiKey, model } = itemData;
+            console.log('[Ollama] Selected model:', model, 'apiBase:', apiBase);
 
-            // 保存配置
-            if (!appConfig.ollama) {
-                appConfig.ollama = {};
+            // 保存到 backend_ollama 存储键
+            const ollamaConfig = getOllamaConfig();
+            ollamaConfig.apiBase = apiBase;
+            ollamaConfig.apiKey = apiKey;
+            ollamaConfig.model = model;
+            saveOllamaConfig(ollamaConfig);
+            console.log('[Ollama] Config saved');
+
+            // 启用 Ollama 后端
+            if (!appConfig.backends) {
+                appConfig.backends = {};
             }
-            appConfig.ollama.apiBase = apiBase;
-            appConfig.ollama.apiKey = apiKey;
-            appConfig.ollama.model = model;
-
-            // 启用 Ollama 后端，关闭其他后端
             appConfig.backends.ollama = true;
             appConfig.backends.libretranslate = false;
             appConfig.backends.offline_dict = false;
 
-            // 持久化存储
+            // 保存应用配置
             if (typeof utools !== 'undefined') {
                 utools.dbStorage.setItem('app_config', appConfig);
                 utools.showNotification(`Ollama 配置成功，当前模型: ${model}`);
@@ -367,6 +391,7 @@ module.exports = {
 
             await new Promise(resolve => setTimeout(resolve, 1000));
 
+            console.log('[Ollama] Returning reloadBackend and restoreSearch signals');
             return {
                 reloadBackend: true,
                 restoreSearch: true

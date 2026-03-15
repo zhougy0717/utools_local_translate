@@ -1,13 +1,35 @@
+const { LibreTranslateConfig } = require('./config');
+
 /**
  * LibreTranslate API 翻译后端驱动
  */
 class LibreTranslateBackend {
     constructor(config = {}) {
-        this.config = {
-            apiBase: config.apiBase || '',
-            apiKey: config.apiKey || ''
-        };
+        // 优先使用传入的配置，否则从存储加载
+        if (config instanceof LibreTranslateConfig) {
+            this.configManager = config;
+            this.config = config.load();
+        } else {
+            this.configManager = new LibreTranslateConfig();
+            this.config = Object.assign({}, this.configManager.load(), config);
+        }
         this.currentAbortController = null;
+    }
+
+    /**
+     * 获取配置管理器
+     * @returns {LibreTranslateConfig}
+     */
+    getConfigManager() {
+        return this.configManager;
+    }
+
+    /**
+     * 重新加载配置
+     */
+    reloadConfig() {
+        this.configManager.clearCache();
+        this.config = this.configManager.load();
     }
 
     /**

@@ -7,9 +7,10 @@
 - [x] 支持ollama API
 - [x] preload.js重构，不应当感知backend
 - [x] ollama配置应当整合到模式选择命令中
-- [ ] 支持libre translate
+- [x] 支持libre translate
 
 # 词典功能
+- [ ] 自动下载词典
 - [ ] 前缀联想、模糊匹配（输入时展示多个候选词）。
 
 

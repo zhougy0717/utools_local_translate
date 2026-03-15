@@ -8,8 +8,8 @@ const libreCommand = require('./libre.js');
 const COMMANDS = [
     modeCommand,
     pathCommand,
-    ollamaCommand,
     proxyCommand,
+    ollamaCommand,
     libreCommand
 ];
 

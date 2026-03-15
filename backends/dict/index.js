@@ -4,21 +4,38 @@
  */
 const path = require('path');
 const fs = require('fs');
+const { DictConfig } = require('./config');
+
+// 共享配置管理器实例
+let sharedConfigManager = null;
 
 function createDictBackend(options) {
-  if (!options || !options.dictRepoPath) {
+  // 如果传入的是 DictConfig 实例，直接使用
+  if (options instanceof DictConfig) {
+    sharedConfigManager = options;
+    options = options.load();
+  } else if (!sharedConfigManager) {
+    sharedConfigManager = new DictConfig();
+  }
+
+  // 合并配置
+  const config = Object.assign({}, sharedConfigManager.load(), options || {});
+  if (!config.dictRepoPath) {
     // 强制要求配置路径
     return {
       queryWord: function (word, sourceLang, targetLang, callback) {
         if (typeof sourceLang === 'function') callback = sourceLang;
         else if (typeof targetLang === 'function') callback = targetLang;
         callback(null, { found: false, message: '请配置词典绝对路径，不配置无法使用' });
+      },
+      getConfigManager: function() {
+        return sharedConfigManager;
       }
     };
   }
 
-  const dbPath = path.join(options.dictRepoPath, 'ecdict.db');
-  const cccedictDbPath = path.join(options.dictRepoPath, 'cccedict.db');
+  const dbPath = path.join(config.dictRepoPath, 'ecdict.db');
+  const cccedictDbPath = path.join(config.dictRepoPath, 'cccedict.db');
 
   function queryWithSqlJs(word, callback) {
     try {
@@ -179,7 +196,12 @@ function createDictBackend(options) {
     executeEcdictQuery();
   }
 
-  return { queryWord };
+  return {
+    queryWord,
+    getConfigManager: function() {
+      return sharedConfigManager;
+    }
+  };
 }
 
 module.exports = { createDictBackend };

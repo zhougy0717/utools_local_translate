@@ -7,59 +7,25 @@ const BackendManager = require('./src/core/backend_manager');
 const ViewPresenter = require('./src/utils/view_presenter');
 const UtoolsHelper = require('./src/utils/utools_helper');
 const CommandManager = require('./commands/index.js');
+const { appConfig } = require('./src/utils/app_config');
+const { DictConfig } = require('./backends/dict/config');
 
 let lastWordToSearch = '';
 
-// 默认配置
-let appConfig = {
-  resourcePath: '',
-  proxy: '',
-  backends: {
-    offline_dict: true,
-    ollama: false,
-    libretranslate: false
-  },
-  ollama: {
-    apiBase: 'http://127.0.0.1:11434/v1',
-    model: '',
-    prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。'
-  },
-  libretranslate: {
-    apiBase: '',
-    apiKey: ''
-  }
+// 初始化配置
+const initialConfig = appConfig.load();
+
+// 构建 BackendManager 需要的配置格式
+const backendConfig = {
+  resourcePath: initialConfig.resourcePath || '',
+  proxy: initialConfig.proxy || '',
+  backends: initialConfig.backends,
+  // 为兼容旧版 BackendManager，传递各 backend 配置
+  ollama: {},
+  libretranslate: {}
 };
 
-// 后续用于持久化配置：控制是否展示查询时延列表项
-const GLOBAL_CONFIG = {
-  showTranslationCost: true
-};
-
-// 从 uTools 数据库中读取配置并初始化 Backend
-if (typeof utools !== 'undefined') {
-  const storedConfig = utools.dbStorage.getItem('app_config');
-  if (storedConfig) {
-    const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
-    appConfig = Object.assign({}, appConfig, storedConfig);
-    // 确保 backends 是合并而非覆盖
-    appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
-    
-    if (!appConfig.ollama) {
-        appConfig.ollama = {
-            apiBase: 'http://127.0.0.1:11434/v1',
-            model: '',
-            prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。'
-        };
-    }
-    if (!appConfig.libretranslate) {
-        appConfig.libretranslate = {
-            apiBase: '',
-            apiKey: ''
-        };
-    }
-  }
-}
-BackendManager.init(appConfig);
+BackendManager.init(backendConfig);
 
 if (typeof window !== 'undefined') {
   window.stopLocalWorker = BackendManager.stop.bind(BackendManager);
@@ -77,12 +43,12 @@ function applyEnterWithWord(word, callbackSetList) {
 
   callbackSetList(ViewPresenter.buildLoadingItem(BackendManager.getLoadingMessage()));
 
-  // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的“请稍候”列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+  // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的"请稍候"列表项，规避 WASM 强占 JS 线程引起的假死和白屏
   setTimeout(() => {
     const startTime = Date.now();
     BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
       const costMs = Date.now() - startTime;
-      callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), GLOBAL_CONFIG.showTranslationCost));
+      callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
     }, function (progressMsg) {
       callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
     });
@@ -137,7 +103,7 @@ if (typeof window !== 'undefined') {
           const w = searchWord.trim();
 
           if (w.startsWith('/')) {
-            CommandManager.handleSearch(w, callbackSetList, appConfig);
+            CommandManager.handleSearch(w, callbackSetList, appConfig.load());
             return;
           }
 
@@ -150,12 +116,12 @@ if (typeof window !== 'undefined') {
             const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
             const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
 
-            // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的“请稍候”列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+            // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的"请稍候"列表项，规避 WASM 强占 JS 线程引起的假死和白屏
             setTimeout(() => {
               const startTime = Date.now();
               BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
                 const costMs = Date.now() - startTime;
-                callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), GLOBAL_CONFIG.showTranslationCost));
+                callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
               }, function (progressMsg) {
                 callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
               });
@@ -171,7 +137,9 @@ if (typeof window !== 'undefined') {
           }
 
           if (itemData.isCommandContext) {
-            Promise.resolve(CommandManager.handleSelect(itemData, appConfig, callbackSetList)).then(signal => {
+            Promise.resolve(CommandManager.handleSelect(itemData, appConfig.load(), callbackSetList))
+              .then(signal => {
+              console.log('[Preload] Command signal:', signal);
               if (!signal) return;
               console.log('[Preload] Command signal resolved:', signal);
 
@@ -180,18 +148,18 @@ if (typeof window !== 'undefined') {
                 BackendManager.openOllamaConfig(() => {
                     console.log('[Preload] Ollama config closed, reloading...');
                     try {
-                        if (typeof utools !== 'undefined') {
-                          const storedConfig = utools.dbStorage.getItem('app_config');
-                          if (storedConfig) {
-                              const oldBackends = JSON.parse(JSON.stringify(appConfig.backends));
-                              appConfig = Object.assign({}, appConfig, storedConfig);
-                              appConfig.backends = Object.assign({}, oldBackends, storedConfig.backends || {});
-                              console.log('[Preload] Updated appConfig:', appConfig);
-                          }
-                        }
-                        
-                        BackendManager.reload(appConfig);
-                        
+                        // 清除配置缓存并重新加载
+                        appConfig.clearCache();
+                        const newConfig = appConfig.load();
+                        const backendConfig = {
+                          resourcePath: newConfig.resourcePath || '',
+                          proxy: newConfig.proxy || '',
+                          backends: newConfig.backends,
+                          ollama: {},
+                          libretranslate: {}
+                        };
+                        BackendManager.reload(backendConfig);
+
                         if (typeof utools !== 'undefined') {
                             setTimeout(() => {
                               utools.setSubInputValue('');
@@ -210,14 +178,33 @@ if (typeof window !== 'undefined') {
                 }
               } else {
                 if (signal.reloadBackend) {
-                  BackendManager.reload(appConfig);
+                  appConfig.clearCache();
+                  const newConfig = appConfig.load();
+                  const backendConfig = {
+                    resourcePath: newConfig.resourcePath || '',
+                    proxy: newConfig.proxy || '',
+                    backends: newConfig.backends,
+                    ollama: {},
+                    libretranslate: {}
+                  };
+                  BackendManager.reload(backendConfig);
                 }
                 if (signal.restoreSearch) {
-                  if (typeof utools !== 'undefined') {
-                    utools.setSubInputValue(lastWordToSearch || '');
+                  const wordToRestore = lastWordToSearch || '';
+                  // 如果有之前查询的单词且不是命令，自动触发翻译
+                  if (wordToRestore && !wordToRestore.startsWith('/')) {
+                    if (typeof utools !== 'undefined') {
+                      utools.setSubInputValue(wordToRestore);
+                    }
+                    applyEnterWithWord(wordToRestore, callbackSetList);
+                  } else if (typeof utools !== 'undefined') {
+                    utools.setSubInputValue(wordToRestore);
                   }
                 }
               }
+            })
+            .catch(err => {
+              console.error('[Preload] Command handleSelect error:', err);
             });
             return;
           }

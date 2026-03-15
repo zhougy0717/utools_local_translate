@@ -1,4 +1,5 @@
 const path = require('path');
+const { OllamaConfig } = require('./config');
 
 /**
  * Ollama API 翻译后端驱动
@@ -6,15 +7,32 @@ const path = require('path');
  */
 class OllamaBackend {
     constructor(config = {}) {
-        this.config = {
-            apiBase: config.apiBase || 'http://127.0.0.1:11434/v1',
-            apiKey: config.apiKey || 'ollama',
-            model: config.model || '',
-            prompt: config.prompt || '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。',
-            temperature: typeof config.temperature !== 'undefined' ? config.temperature : 0.1
-        };
+        // 优先使用传入的配置，否则从存储加载
+        if (config instanceof OllamaConfig) {
+            this.configManager = config;
+            this.config = config.load();
+        } else {
+            this.configManager = new OllamaConfig();
+            this.config = Object.assign({}, this.configManager.load(), config);
+        }
         this.workerStopping = false;
         this.currentAbortController = null;
+    }
+
+    /**
+     * 获取配置管理器
+     * @returns {OllamaConfig}
+     */
+    getConfigManager() {
+        return this.configManager;
+    }
+
+    /**
+     * 重新加载配置
+     */
+    reloadConfig() {
+        this.configManager.clearCache();
+        this.config = this.configManager.load();
     }
 
     /**
@@ -150,7 +168,7 @@ class OllamaBackend {
             const iframe = document.createElement('iframe');
             
             // 使用更健壮的路径计算
-            const htmlPath = path.resolve(__dirname, 'ollama.html');
+            const htmlPath = path.resolve(__dirname, 'ollama-prompt-config.html');
             let normalizedPath = htmlPath.replace(/\\/g, '/');
             if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
             

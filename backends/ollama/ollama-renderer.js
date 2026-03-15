@@ -11,6 +11,7 @@ const UI = {
 };
 
 const DEFAULT_PROMPT = '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。';
+const STORAGE_KEY = 'backend_ollama';
 
 function showMessage(text, isError = false) {
     UI.statusMessage.textContent = text;
@@ -21,25 +22,27 @@ function showMessage(text, isError = false) {
 }
 
 function loadConfig() {
-    let appConfig = {
-        ollama: {
-            prompt: DEFAULT_PROMPT
-        }
+    const defaults = {
+        apiBase: 'http://127.0.0.1:11434/v1',
+        apiKey: 'ollama',
+        model: '',
+        prompt: DEFAULT_PROMPT,
+        temperature: 0.1
     };
 
+    let config = defaults;
+
     if (typeof utools !== 'undefined') {
-        const storedConfig = utools.dbStorage.getItem('app_config');
+        const storedConfig = utools.dbStorage.getItem(STORAGE_KEY);
         if (storedConfig) {
-            appConfig = storedConfig;
-            if (!appConfig.ollama) appConfig.ollama = {};
-            if (!appConfig.ollama.prompt) appConfig.ollama.prompt = DEFAULT_PROMPT;
+            config = Object.assign({}, defaults, storedConfig);
         }
     }
-    return appConfig;
+    return config;
 }
 
 function renderConfig(config) {
-    UI.prompt.value = config.ollama.prompt || DEFAULT_PROMPT;
+    UI.prompt.value = config.prompt || DEFAULT_PROMPT;
 }
 
 function saveConfig() {
@@ -48,11 +51,11 @@ function saveConfig() {
         return;
     }
 
-    const config = loadConfig();
+    const currentConfig = loadConfig();
     // 只更新 prompt，保持其他配置不变
-    config.ollama.prompt = UI.prompt.value.trim() || DEFAULT_PROMPT;
+    currentConfig.prompt = UI.prompt.value.trim() || DEFAULT_PROMPT;
 
-    utools.dbStorage.setItem('app_config', config);
+    utools.dbStorage.setItem(STORAGE_KEY, currentConfig);
     showMessage('配置已保存');
 
     // 延迟一点关闭
