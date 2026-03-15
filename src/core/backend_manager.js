@@ -1,6 +1,6 @@
-const { createDictBackend } = require('../../backends/dict/index.js');
-const { createOllamaBackend } = require('../../backends/ollama/index.js');
-const { createLibreTranslateBackend } = require('../../backends/libretranslate/index.js');
+const { createDictBackend } = require('../backends/dict/index.js');
+const { createOllamaBackend } = require('../backends/ollama/index.js');
+const { createLibreTranslateBackend } = require('../backends/libretranslate/index.js');
 
 class BackendManager {
   constructor() {

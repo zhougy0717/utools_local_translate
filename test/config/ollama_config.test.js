@@ -32,7 +32,7 @@ jest.mock('../../src/utils/storage_adapter', () => ({
   }
 }));
 
-const { OllamaConfig, OLLAMA_DEFAULTS } = require('../../backends/ollama/config');
+const { OllamaConfig, OLLAMA_DEFAULTS } = require('../../src/backends/ollama/config');
 
 describe('OllamaConfig', () => {
   let config;

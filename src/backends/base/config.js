@@ -2,7 +2,7 @@
  * Backend 配置抽象基类
  * 定义配置加载/保存的统一接口
  */
-const { storageAdapter } = require('../../src/utils/storage_adapter');
+const { storageAdapter } = require('../../utils/storage_adapter');
 
 class AbstractBackendConfig {
   /**

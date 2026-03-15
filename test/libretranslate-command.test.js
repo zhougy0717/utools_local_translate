@@ -1,7 +1,7 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('assert');
 const nock = require('nock');
-const libreCommand = require('../commands/libre.js');
+const libreCommand = require('../src/commands/libre.js');
 
 describe('LibreTranslate Command', () => {
     let mockAppConfig;

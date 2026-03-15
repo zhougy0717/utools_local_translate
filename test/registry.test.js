@@ -1,7 +1,7 @@
 /**
  * BackendRegistry 测试
  */
-const { BackendRegistry } = require('../../backends/registry');
+const { BackendRegistry } = require('../../src/backends/registry');
 
 describe('BackendRegistry', () => {
   let registry;

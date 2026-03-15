@@ -3,12 +3,12 @@ const assert = require('node:assert');
 
 // 先清除缓存
 delete require.cache[require.resolve('../src/core/backend_manager')];
-delete require.cache[require.resolve('../backends/dict/index.js')];
-delete require.cache[require.resolve('../backends/ollama/index.js')];
+delete require.cache[require.resolve('../src/backends/dict/index.js')];
+delete require.cache[require.resolve('../src/backends/ollama/index.js')];
 
 // 先加载后端的 Module 并进行 mock
-const dictModule = require('../backends/dict/index.js');
-const ollamaModule = require('../backends/ollama/index.js');
+const dictModule = require('../src/backends/dict/index.js');
+const ollamaModule = require('../src/backends/ollama/index.js');
 
 let dictCallArg = null;
 let ollamaCallArg = null;

@@ -1,6 +1,6 @@
 const { describe, it } = require('node:test');
 const assert = require('node:assert');
-const CommandManager = require('../commands/index.js');
+const CommandManager = require('../src/commands/index.js');
 
 describe('Slash Command Manager', () => {
 

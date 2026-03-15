@@ -6,9 +6,9 @@
 const BackendManager = require('./src/core/backend_manager');
 const ViewPresenter = require('./src/utils/view_presenter');
 const UtoolsHelper = require('./src/utils/utools_helper');
-const CommandManager = require('./commands/index.js');
+const CommandManager = require('./src/commands/index.js');
 const { appConfig } = require('./src/utils/app_config');
-const { DictConfig } = require('./backends/dict/config');
+const { DictConfig } = require('./src/backends/dict/config');
 
 let lastWordToSearch = '';
 

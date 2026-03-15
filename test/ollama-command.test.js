@@ -1,5 +1,5 @@
 const assert = require('assert');
-const ollamaCommand = require('../commands/ollama.js');
+const ollamaCommand = require('../src/commands/ollama.js');
 
 describe('Ollama Command Manager', () => {
     it('should show not configured status when model is empty', () => {

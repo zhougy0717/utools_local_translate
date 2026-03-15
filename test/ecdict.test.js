@@ -7,7 +7,7 @@ const { describe, it } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
-const { createDictBackend } = require('../backends/dict/index.js');
+const { createDictBackend } = require('../src/backends/dict/index.js');
 
 const resourcesDir = path.join(__dirname, '..', 'resources');
 const backend = createDictBackend({ dictRepoPath: resourcesDir });

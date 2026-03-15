@@ -1,6 +1,6 @@
 const assert = require('assert');
 const nock = require('nock'); // Need to install nock for mocking HTTP requests
-const { OllamaBackend } = require('../../backends/ollama/index.js');
+const { OllamaBackend } = require('../../src/backends/ollama/index.js');
 
 describe('OllamaBackend', () => {
     let backend;

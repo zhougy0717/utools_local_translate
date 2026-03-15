@@ -1,7 +1,7 @@
 const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('assert');
 const nock = require('nock');
-const { LibreTranslateBackend } = require('../backends/libretranslate/index.js');
+const { LibreTranslateBackend } = require('../src/backends/libretranslate/index.js');
 
 describe('LibreTranslateBackend', () => {
     let backend;
