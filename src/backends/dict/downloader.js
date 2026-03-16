@@ -19,6 +19,26 @@ const ECDICT_FILENAME = 'ecdict-sqlite-28.zip';
 const CCCEDICT_URL = 'https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip';
 const CCCEDICT_FILENAME = 'cedict_1_0_ts_utf-8_mdbg.zip';
 
+// ============================================================
+// Gitee 分卷下载配置（spec-00024）
+// 上传完成后手工填入以下字段：
+//   baseUrl   — Gitee Release 或 Raw 直链前缀，末尾不含文件名，以 '/' 结尾
+//               示例: 'https://gitee.com/user/repo/releases/download/v1.0.0/'
+//   volumes   — 分卷总数（与 scripts/split_dict.py 生成的数量一致）
+//   checksums — 每个分卷的 MD5（顺序与分卷序号对应，可从 checksum.json 复制）
+// ============================================================
+const GITEE_ECDICT_CONFIG = {
+  baseUrl: 'https://gitee.com/benzhou-guangyu/utools_local_translate/releases/download/0.1/',
+  volumes: 5,
+  checksums: [
+    'a4e362107154e08e1333ed659cf1d6f4',
+    '2a123d9e476531eb57da022cce22fb6e',
+    '59b18c385a335c1fba968c3d36153213',
+    'd518c048fc286f1e028585114f5f9a11',
+    '3b9bf147cf543afbdbc86093f3c1f828'
+  ]
+};
+
 // 下载超时时间（毫秒）
 const DOWNLOAD_TIMEOUT = 5 * 60 * 1000; // 5分钟
 
@@ -201,7 +221,7 @@ class DictDownloader {
 
         const isResume = res.statusCode === 206;
         const contentLength = parseInt(res.headers['content-range']?.split('/')[1], 10) ||
-                              parseInt(res.headers['content-length'], 10) || 0;
+          parseInt(res.headers['content-length'], 10) || 0;
 
         // 计算总大小（断点续传时需要加上已下载的部分）
         const totalSize = isResume ? contentLength : contentLength;
@@ -313,12 +333,82 @@ class DictDownloader {
   }
 
   /**
-   * 下载 ECDICT 词典
+   * 下载 ECDICT 词典 (GitHub)
    * @param {Function} onProgress 进度回调函数 (percent, downloaded, total)
    * @returns {Promise<{success: boolean, path: string, error?: Error}>}
    */
   async downloadEcdict(onProgress) {
     return this.downloadFile(ECDICT_URL, ECDICT_FILENAME, onProgress);
+  }
+
+  /**
+   * 从 Gitee 按序下载所有分卷 (spec-00024)
+   *
+   * 分卷文件命名规则: ecdict.zip.001, ecdict.zip.002, ...
+   * 支持各分卷独立的断点续传（复用 downloadFile 内部的 TEMP_SUFFIX 机制）。
+   *
+   * @param {Object} [config] 分卷配置（默认使用 GITEE_ECDICT_CONFIG）
+   * @param {string} config.baseUrl  Gitee 直链前缀，末尾含 '/'
+   * @param {number} config.volumes  分卷总数
+   * @param {string[]} config.checksums 每个分卷的期望 MD5（按序）
+   * @param {Function} onProgress 进度回调 (percent, downloadedTotal, sizeTotal)
+   * @returns {Promise<{success: boolean, paths: string[], error?: Error}>}
+   */
+  async downloadVolumes(config, onProgress) {
+    const { baseUrl, volumes, checksums } = Object.assign({}, GITEE_ECDICT_CONFIG, config);
+
+    if (!baseUrl || baseUrl.startsWith('YOUR_')) {
+      return {
+        success: false,
+        paths: [],
+        error: new Error('Gitee 下载链接尚未配置，请填写 downloader.js 中的 GITEE_ECDICT_CONFIG.baseUrl')
+      };
+    }
+
+    const paths = [];
+    // 用于汇总进度的 sizes 缓存（各分卷已下载字节数）
+    const sessionSizes = new Array(volumes).fill(0);
+    // 先用 0 估算总量，待第一个分卷响应后再修正（Gitee 不一定返回 Content-Length）
+    let knownTotal = 0;
+
+    for (let i = 1; i <= volumes; i++) {
+      const paddedIndex = String(i).padStart(3, '0');
+      const filename = `ecdict.zip.${paddedIndex}`;
+      const url = `${baseUrl}${filename}`;
+
+      const result = await this.downloadFile(
+        url,
+        filename,
+        (percent, downloaded, total) => {
+          // 更新当前分卷的已下载量
+          sessionSizes[i - 1] = downloaded;
+          // 估算总进度
+          if (total > 0) knownTotal = Math.max(knownTotal, total * volumes);
+          const totalDownloaded = sessionSizes.reduce((a, b) => a + b, 0);
+          const overallPercent = knownTotal > 0
+            ? Math.min(Math.round((totalDownloaded / knownTotal) * 100), 99)
+            : Math.round(((i - 1 + percent / 100) / volumes) * 100);
+
+          if (onProgress) {
+            onProgress(overallPercent, totalDownloaded, knownTotal);
+          }
+        }
+      );
+
+      if (!result.success) {
+        return {
+          success: false,
+          paths,
+          error: result.error || new Error(`分卷 ${filename} 下载失败`)
+        };
+      }
+
+      paths.push(result.path);
+    }
+
+    if (onProgress) onProgress(100, knownTotal, knownTotal);
+
+    return { success: true, paths };
   }
 
   /**

@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { OllamaConfig } = require('../backends/ollama/config');
-const { getDictStatus: getBackendDictStatus, downloadDicts, buildAllDicts, DICT_STATUS } = require('../backends/dict');
+const { getDictStatus: getBackendDictStatus, downloadDicts, downloadEcdictFromGitee, buildAllDicts, DICT_STATUS } = require('../backends/dict');
 
 const MODES = [
     {
@@ -113,12 +113,12 @@ module.exports = {
 
     handleSelect(itemData, appConfig, callbackSetList) {
         // 优先处理特定操作（如下载词典）
-        if (itemData.action === 'download_dict' || itemData.action === 'build_dict_retry_clean') {
+        if (itemData.action === 'download_dict' || itemData.action === 'download_dict_gitee' || itemData.action === 'build_dict_retry_clean') {
             // 如果是清理重试，先删除可能的损坏文件
             if (itemData.action === 'build_dict_retry_clean') {
                 const repoPath = appConfig.resourcePath;
                 if (repoPath) {
-                    ['ecdict-sqlite-28.zip', 'cedict_1_0_ts_utf-8_mdbg.zip'].forEach(file => {
+                    ['ecdict-sqlite-28.zip', 'cedict_1_0_ts_utf-8_mdbg.zip', 'ecdict_merged.zip'].forEach(file => {
                         const p = path.join(repoPath, file);
                         if (fs.existsSync(p)) {
                             try { fs.unlinkSync(p); } catch(e) {}
@@ -126,8 +126,11 @@ module.exports = {
                     });
                 }
             }
+
+            const downloadFn = itemData.action === 'download_dict_gitee' ? handleDownloadDictFromGitee : handleDownloadDict;
+
             // 异步执行下载，立即返回以保持 UI 响应
-            handleDownloadDict(itemData, appConfig, callbackSetList).catch(err => {
+            downloadFn(itemData, appConfig, callbackSetList).catch(err => {
                 console.error('Download failed:', err);
                 callbackSetList([{
                     title: '下载出错',
@@ -158,11 +161,18 @@ module.exports = {
                     // 有资源路径但词典文件不存在：显示下载选项
                     instructions = [
                         {
-                            title: '立即下载词典',
-                            description: '点击开始下载 ECDICT 和 CC-CEDICT 词典（约 30MB）',
+                            title: '从 GitHub 下载 (标准)',
+                            description: '点击开始从 GitHub 下载完整 Zip 压缩包（可能较慢）',
                             isCommandContext: true,
                             commandTrigger: 'mode',
                             action: 'download_dict'
+                        },
+                        {
+                            title: '从 Gitee 下载 (国内极速)',
+                            description: '通过分卷方式从 Gitee 下载（国内推荐，自动合并）',
+                            isCommandContext: true,
+                            commandTrigger: 'mode',
+                            action: 'download_dict_gitee'
                         },
                         { title: '如何手动配置？', description: '您可以在设置中配置词典绝对路径' }
                     ];
@@ -194,13 +204,22 @@ module.exports = {
         // 处理下载中断状态（断点续传）
         if (status === STATUS.DOWNLOADING) {
             if (itemData.modeId === 'offline_dict') {
-                callbackSetList([{
-                    title: '检测到未完成的下载',
-                    description: '点击继续下载上次中断的文件...',
-                    isCommandContext: true,
-                    commandTrigger: 'mode',
-                    action: 'download_dict'
-                }]);
+                callbackSetList([
+                    {
+                        title: '检测到未完成的下载',
+                        description: '点击继续从 GitHub 下载 (如有 Git 缓存)...',
+                        isCommandContext: true,
+                        commandTrigger: 'mode',
+                        action: 'download_dict'
+                    },
+                    {
+                        title: '或切换至 Gitee 下载 (国内推荐/支持续传)',
+                        description: '清除当前任务并尝试分卷下载',
+                        isCommandContext: true,
+                        commandTrigger: 'mode',
+                        action: 'download_dict_gitee'
+                    }
+                ]);
                 return { disableClear: true };
             }
         }
@@ -331,6 +350,93 @@ module.exports = {
  * @param {Function} callbackSetList 列表更新回调
  * @returns {Object} 操作结果
  */
+/**
+ * 处理从 Gitee 下载词典 (spec-00024)
+ */
+async function handleDownloadDictFromGitee(_itemData, appConfig, callbackSetList) {
+    const repoPath = appConfig.resourcePath;
+    if (!repoPath) {
+        callbackSetList([{ title: '错误', description: '未配置资源路径' }]);
+        return { disableClear: true };
+    }
+
+    if (!fs.existsSync(repoPath)) fs.mkdirSync(repoPath, { recursive: true });
+
+    callbackSetList([{
+        title: '正在从 Gitee 下载分卷...',
+        description: '准备中...',
+        isCommandContext: true,
+        commandTrigger: 'mode',
+        action: 'download_dict_progress'
+    }]);
+
+    try {
+        const result = await downloadEcdictFromGitee({
+            destDir: repoPath,
+            proxy: appConfig.proxy,
+            onProgress: (progress, phase) => {
+                if (typeof progress === 'string') {
+                  // 处理 builder 返回的消息阶段
+                  callbackSetList([{
+                      title: progress,
+                      description: `${phase === 'ecdict' ? 'ECDICT' : '词典'} 处理中...`,
+                      isCommandContext: true,
+                      commandTrigger: 'mode',
+                      action: 'download_dict_progress'
+                  }]);
+                  return;
+                }
+
+                const percent = progress.percent || 0;
+                const downloaded = formatBytes(progress.downloaded || 0);
+                const total = formatBytes(progress.total || 0);
+                
+                callbackSetList([{
+                    title: `正在从 Gitee 下载分卷...`,
+                    description: `${percent}% | 已下载 ${downloaded}/${total}`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    action: 'download_dict_progress'
+                }]);
+            }
+        });
+
+        if (result.success) {
+            // 完成后切换模式
+            appConfig.backends.offline_dict = true;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = false;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+
+            callbackSetList([{
+                title: '词典已就绪',
+                description: '已通过 Gitee 分卷下载并自动完成构建',
+                isCommandContext: true,
+                commandTrigger: 'mode',
+                modeId: 'offline_dict'
+            }]);
+
+            return { reloadBackend: true, restoreSearch: true };
+        } else {
+            callbackSetList([{
+                title: 'Gitee 下载失败',
+                description: result.error ? result.error.message : '未知错误',
+                isCommandContext: true,
+                commandTrigger: 'mode',
+                action: 'download_dict_gitee'
+            }]);
+        }
+    } catch (err) {
+        callbackSetList([{
+            title: 'Gitee 下载出错',
+            description: err.message || String(err),
+            isCommandContext: true,
+            commandTrigger: 'mode',
+            action: 'download_dict_gitee'
+        }]);
+    }
+}
+
 async function handleDownloadDict(_itemData, appConfig, callbackSetList) {
     const repoPath = appConfig.resourcePath;
 

@@ -135,6 +135,49 @@ async function unzip(zipBuffer, destDir) {
 }
 
 /**
+ * 流式合并分卷文件 (spec-00024)
+ * @param {string[]} volumePaths 分卷文件路径列表（需按序号排列）
+ * @param {string} outputPath 合并后的目标文件路径
+ * @returns {Promise<string>} 成功返回目标路径
+ */
+function mergeVolumes(volumePaths, outputPath) {
+  return new Promise((resolve, reject) => {
+    const writeStream = fs.createWriteStream(outputPath);
+    let currentIdx = 0;
+
+    function mergeNext() {
+      if (currentIdx >= volumePaths.length) {
+        writeStream.end();
+        return;
+      }
+
+      const readStream = fs.createReadStream(volumePaths[currentIdx]);
+      readStream.pipe(writeStream, { end: false });
+
+      readStream.on('end', () => {
+        currentIdx++;
+        mergeNext();
+      });
+
+      readStream.on('error', (err) => {
+        writeStream.destroy();
+        reject(err);
+      });
+    }
+
+    writeStream.on('finish', () => {
+      resolve(outputPath);
+    });
+
+    writeStream.on('error', (err) => {
+      reject(err);
+    });
+
+    mergeNext();
+  });
+}
+
+/**
  * 构建 ECDICT 数据库
  * ECDICT 的 zip 中直接包含 ecdict.db，只需解压
  * @param {string} zipPath zip 文件路径
@@ -412,6 +455,7 @@ module.exports = {
   buildEcdict,
   buildCccedict,
   buildAllDicts,
+  mergeVolumes,
   ECDICT_ZIP,
   CCCEDICT_ZIP,
   ECDICT_DB,

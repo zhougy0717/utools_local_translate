@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { DictConfig } = require('./config');
 const { DictDownloader } = require('./downloader');
-const { buildAllDicts } = require('./builder');
+const { buildAllDicts, mergeVolumes, buildEcdict } = require('./builder');
 
 // 词典状态枚举
 const DICT_STATUS = {
@@ -100,6 +100,52 @@ async function downloadDicts(options) {
 
   const result = await downloader.downloadAll(onProgress);
   return result;
+}
+
+/**
+ * 从 Gitee 下载并构建 ECDICT 词典 (spec-00024)
+ * @param {Object} options 选项
+ * @param {string} options.destDir 目标目录
+ * @param {string} [options.proxy] 代理
+ * @param {Function} options.onProgress 进度回调
+ * @returns {Promise<Object>} 
+ */
+async function downloadEcdictFromGitee(options) {
+  const { destDir, proxy, onProgress } = options;
+  if (!destDir) return { success: false, error: new Error('destDir is required') };
+
+  const downloader = new DictDownloader({ destDir, proxy });
+  
+  // 1. 下载分卷
+  if (onProgress) onProgress({ dict: 'ecdict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
+  const dlResult = await downloader.downloadVolumes(null, (percent, downloaded, total) => {
+    if (onProgress) onProgress({ dict: 'ecdict', percent, downloaded, total }, 'downloading');
+  });
+
+  if (!dlResult.success) return dlResult;
+
+  // 2. 合并分卷
+  if (onProgress) onProgress('正在合并分卷...', 90, 'ecdict');
+  const mergedZipPath = path.join(destDir, 'ecdict_merged.zip');
+  try {
+    await mergeVolumes(dlResult.paths, mergedZipPath);
+  } catch (err) {
+    return { success: false, error: new Error(`合并分卷失败: ${err.message}`) };
+  }
+
+  // 3. 构建 (解压并重命名)
+  if (onProgress) onProgress('正在解压与构建...', 95, 'ecdict');
+  const buildResult = await buildEcdict(mergedZipPath, destDir, (msg, pct) => {
+    if (onProgress) onProgress(msg, pct, 'ecdict');
+  });
+
+  // 4. 清理分卷
+  dlResult.paths.forEach(p => {
+    if (fs.existsSync(p)) fs.unlinkSync(p);
+  });
+  if (fs.existsSync(mergedZipPath)) fs.unlinkSync(mergedZipPath);
+
+  return buildResult;
 }
 
 function createDictBackend(options) {
@@ -310,6 +356,7 @@ module.exports = {
   createDictBackend,
   getDictStatus,
   downloadDicts,
+  downloadEcdictFromGitee,
   buildAllDicts,
   DICT_STATUS
 };
