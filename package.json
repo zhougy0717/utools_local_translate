@@ -5,7 +5,8 @@
   "type": "commonjs",
   "private": true,
   "scripts": {
-    "test": "node --test test/"
+    "test": "node --test test/",
+    "release": "python3 scripts/release.py"
   },
   "dependencies": {
     "sql.js": "^1.10.0",

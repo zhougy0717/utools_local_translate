@@ -8,16 +8,15 @@ uTools 列表模式插件：输入单词或中文，自动识别语言并查词�
 - **中→英**：输入中文（或含中文），查询 CC-CEDICT 词库，展示英文释义与拼音。
 - 输入框会根据是否包含中文自动选择查词方向，无需手动切换。
 
-## 词库（双 SQLite 数据库，支持压缩发布）
+## 词库（双 SQLite 数据库）
 
 - **英→中**：`resources/ecdict.db`（表 `stardict`）；**中→英**：`resources/cccedict.db`（表 `cccedict`）。
-- 发布包可仅包含 **ecdict.db.gz**、**cccedict.db.gz** 以减小体积。用户**首次使用**某方向查词时，插件会自动解压对应 .gz 为 .db 并删除 .gz，之后直接使用 .db，无需再次解压。
 
-## 维护者：构建词库与压缩包
+## 维护者：构建词库与分发
 
 ### 生成 cccedict.db
 
-中→英词库由 CC-CEDICT 数据生成。维护者发布新版本前，可运行项目内 Python 脚本从网络下载 CC-CEDICT 并生成 `resources/cccedict.db`，与 ecdict.db 一并打包发布。
+中→英词库由 CC-CEDICT 数据生成。维护者发布新版本前，可运行项目内 Python 脚本从网络下载 CC-CEDICT 并生成 `resources/cccedict.db`。
 
 **运行方式（在项目根目录）：**
 
@@ -32,21 +31,26 @@ python3 scripts/build_cccedict.py
 
 详见 `scripts/build_cccedict.py` 内注释。
 
-### 压缩为 .gz（减小发布体积）
+### 分卷处理（用于 Gitee 下载）
 
-打包前可将两个 .db 压缩为 .gz，发布包内只带 .gz，用户首次使用时自动解压：
+为了绕过 Gitee 的文件大小限制，词典数据库需要分卷打包：
 
 ```bash
-python3 scripts/zip_dicts.py
+python3 scripts/split_dict.py
 ```
 
-- 默认读取并输出到 `resources/`，生成 `ecdict.db.gz`、`cccedict.db.gz`。
-- 可选：`--input <目录>`、`--output <目录>`。详见 `scripts/zip_dicts.py` 内注释。
+- 该脚本会将 `resources/ecdict.db` 压缩并分割为多个分卷。详见相关设计文档。
 
 ## 打包发布
 
-- 若使用压缩发布：发布前运行 `python3 scripts/zip_dicts.py`，将 `resources/` 下的 **ecdict.db.gz**、**cccedict.db.gz** 随插件打包即可；用户首次查词时自动解压并删除 .gz。
-- 若不压缩：发布前确认 `resources/` 下存在 `ecdict.db` 与 `cccedict.db`，随插件一起打包。
+运行发布脚本准备发布包：
+
+```bash
+python3 scripts/release.py
+```
+
+- 该脚本会精简 `node_modules` 并拷贝必要文件到 `release/` 目录。
+- **注意**：插件已支持自动下载功能，发布包本身不强制包含庞大的词典文件。
 
 ## 离线词典资源下载指南
 
