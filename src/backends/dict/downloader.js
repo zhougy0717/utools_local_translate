@@ -339,6 +339,11 @@ class DictDownloader {
    * @returns {Promise<{success: boolean, path: string, error?: Error}>}
    */
   async downloadEcdict(onProgress) {
+    const dbPath = path.join(this.destDir, 'ecdict.db');
+    if (fs.existsSync(dbPath)) {
+      if (onProgress) onProgress(100, 1, 1);
+      return { success: true, path: dbPath, skipped: true };
+    }
     return this.downloadFile(ECDICT_URL, ECDICT_FILENAME, onProgress);
   }
 
@@ -364,6 +369,15 @@ class DictDownloader {
         paths: [],
         error: new Error('Gitee 下载链接尚未配置，请填写 downloader.js 中的 GITEE_ECDICT_CONFIG.baseUrl')
       };
+    }
+
+    const dbPath = path.join(this.destDir, 'ecdict.db');
+    const zipPath = path.join(this.destDir, ECDICT_FILENAME);
+    const mergedZipPath = path.join(this.destDir, 'ecdict_merged.zip');
+
+    if (fs.existsSync(dbPath) || fs.existsSync(zipPath) || fs.existsSync(mergedZipPath)) {
+      if (onProgress) onProgress(100, 1, 1);
+      return { success: true, paths: [], skipped: true };
     }
 
     const paths = [];
@@ -418,6 +432,11 @@ class DictDownloader {
    * @returns {Promise<{success: boolean, path: string, error?: Error}>}
    */
   async downloadCccedict(onProgress) {
+    const dbPath = path.join(this.destDir, 'cccedict.db');
+    if (fs.existsSync(dbPath)) {
+      if (onProgress) onProgress(100, 1, 1);
+      return { success: true, path: dbPath, skipped: true };
+    }
     return this.downloadFile(CCCEDICT_URL, CCCEDICT_FILENAME, onProgress);
   }
 

@@ -114,36 +114,51 @@ async function downloadEcdictFromGitee(options) {
   const { destDir, proxy, onProgress } = options;
   if (!destDir) return { success: false, error: new Error('destDir is required') };
 
-  const downloader = new DictDownloader({ destDir, proxy });
-  
-  // 1. 下载分卷
-  if (onProgress) onProgress({ dict: 'ecdict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
-  const dlResult = await downloader.downloadVolumes(null, (percent, downloaded, total) => {
-    if (onProgress) onProgress({ dict: 'ecdict', percent, downloaded, total }, 'downloading');
-  });
-
-  if (!dlResult.success) return dlResult;
-
-  // 2. 合并分卷
-  if (onProgress) onProgress('正在合并分卷...', 90, 'ecdict');
-  const mergedZipPath = path.join(destDir, 'ecdict_merged.zip');
-  try {
-    await mergeVolumes(dlResult.paths, mergedZipPath);
-  } catch (err) {
-    return { success: false, error: new Error(`合并分卷失败: ${err.message}`) };
+  const dbPath = path.join(destDir, 'ecdict.db');
+  if (fs.existsSync(dbPath)) {
+    if (onProgress) onProgress({ percent: 100, downloaded: 1, total: 1 }, 'ecdict');
+    return { success: true, skipped: true };
   }
+
+  const zipPath = path.join(destDir, ECDICT_ZIP);
+  const mergedZipPath = path.join(destDir, 'ecdict_merged.zip');
+
+  if (!fs.existsSync(zipPath) && !fs.existsSync(mergedZipPath)) {
+    const downloader = new DictDownloader({ destDir, proxy });
+    
+    // 1. 下载分卷
+    if (onProgress) onProgress({ dict: 'ecdict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
+    const dlResult = await downloader.downloadVolumes(null, (percent, downloaded, total) => {
+      if (onProgress) onProgress({ dict: 'ecdict', percent, downloaded, total }, 'downloading');
+    });
+
+    if (!dlResult.success) return dlResult;
+
+    // 2. 合并分卷
+    if (onProgress) onProgress('正在合并分卷...', 90, 'ecdict');
+    try {
+      await mergeVolumes(dlResult.paths, mergedZipPath);
+    } catch (err) {
+      return { success: false, error: new Error(`合并分卷失败: ${err.message}`) };
+    }
+
+    // 清理分卷
+    dlResult.paths.forEach(p => {
+      if (fs.existsSync(p)) fs.unlinkSync(p);
+    });
+  }
+
+  const targetZipPath = fs.existsSync(mergedZipPath) ? mergedZipPath : zipPath;
 
   // 3. 构建 (解压并重命名)
   if (onProgress) onProgress('正在解压与构建...', 95, 'ecdict');
-  const buildResult = await buildEcdict(mergedZipPath, destDir, (msg, pct) => {
+  const buildResult = await buildEcdict(targetZipPath, destDir, (msg, pct) => {
     if (onProgress) onProgress(msg, pct, 'ecdict');
   });
 
-  // 4. 清理分卷
-  dlResult.paths.forEach(p => {
-    if (fs.existsSync(p)) fs.unlinkSync(p);
-  });
-  if (fs.existsSync(mergedZipPath)) fs.unlinkSync(mergedZipPath);
+  if (targetZipPath === mergedZipPath && fs.existsSync(mergedZipPath)) {
+    fs.unlinkSync(mergedZipPath);
+  }
 
   return buildResult;
 }
