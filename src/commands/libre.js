@@ -1,5 +1,7 @@
 const UtoolsHelper = require('../utils/utools_helper');
 const { LibreTranslateConfig } = require('../backends/libretranslate/config');
+const http = require('http');
+const https = require('https');
 
 module.exports = {
     trigger: 'libre',
@@ -43,12 +45,21 @@ module.exports = {
 
             // 异步检测连通性
             const endpoint = `${currentApiBase.replace(/\/+$/, '')}/languages`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000); // 列表页自动检测设为 2s 超时
+            
+            let controller;
+            let signal;
+            if (typeof AbortController !== 'undefined') {
+                controller = new AbortController();
+                signal = controller.signal;
+            }
 
-            fetch(endpoint, { 
+            const timeoutId = setTimeout(() => {
+                if (controller) controller.abort();
+            }, 2000); // 列表页自动检测设为 2s 超时
+
+            this._directRequest(endpoint, { 
                 method: 'GET',
-                signal: controller.signal,
+                signal: signal,
                 headers: currentApiKey ? { 'Authorization': `Bearer ${currentApiKey}` } : {}
             })
             .then(res => {
@@ -115,11 +126,20 @@ module.exports = {
 
             try {
                 const endpoint = `${apiBase.replace(/\/+$/, '')}/languages`;
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2000); // 手动确认也改为 2s 超时
+                
+                let controller;
+                let signal;
+                if (typeof AbortController !== 'undefined') {
+                    controller = new AbortController();
+                    signal = controller.signal;
+                }
 
-                const response = await fetch(endpoint, { 
-                    signal: controller.signal,
+                const timeoutId = setTimeout(() => {
+                    if (controller) controller.abort();
+                }, 2000); // 手动确认也改为 2s 超时
+
+                const response = await this._directRequest(endpoint, { 
+                    signal: signal,
                     headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
                 });
                 
@@ -178,5 +198,44 @@ module.exports = {
         }
 
         return {};
+    },
+
+    // 发起不经过代理的直接请求
+    _directRequest(url, options) {
+        return new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const protocol = urlObj.protocol === 'https:' ? https : http;
+            
+            const reqOptions = {
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                signal: options.signal
+            };
+
+            const req = protocol.request(url, reqOptions, (res) => {
+                let data = '';
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve({
+                        ok: res.statusCode >= 200 && res.statusCode < 300,
+                        status: res.statusCode,
+                        json: async () => JSON.parse(data),
+                        text: async () => data
+                    });
+                });
+            });
+
+            req.on('error', (err) => {
+                reject(err);
+            });
+
+            if (options.body) {
+                req.write(options.body);
+            }
+            req.end();
+        });
     }
 };

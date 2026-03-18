@@ -1,3 +1,5 @@
+const http = require('http');
+const https = require('https');
 const { LibreTranslateConfig } = require('./config');
 
 /**
@@ -66,7 +68,7 @@ class LibreTranslateBackend {
 
         const endpoint = `${apiBase.replace(/\/+$/, '')}/translate`;
 
-        fetch(endpoint, fetchOptions)
+        this._directRequest(endpoint, fetchOptions)
             .then(res => {
                 if (!res.ok) {
                     if (res.status === 403) {
@@ -103,6 +105,45 @@ class LibreTranslateBackend {
                     message: errorMsg
                 });
             });
+    }
+
+    // 发起不经过代理的直接请求
+    _directRequest(url, options) {
+        return new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const protocol = urlObj.protocol === 'https:' ? https : http;
+            
+            const reqOptions = {
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                signal: options.signal
+            };
+
+            const req = protocol.request(url, reqOptions, (res) => {
+                let data = '';
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve({
+                        ok: res.statusCode >= 200 && res.statusCode < 300,
+                        status: res.statusCode,
+                        json: async () => JSON.parse(data),
+                        text: async () => data
+                    });
+                });
+            });
+
+            req.on('error', (err) => {
+                reject(err);
+            });
+
+            if (options.body) {
+                req.write(options.body);
+            }
+            req.end();
+        });
     }
 
     stopWorker() {

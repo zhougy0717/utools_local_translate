@@ -1,4 +1,6 @@
 const { OllamaConfig, OLLAMA_DEFAULTS } = require('../backends/ollama/config');
+const http = require('http');
+const https = require('https');
 
 // 获取 Ollama 配置（从独立存储键 backend_ollama）
 function getOllamaConfig() {
@@ -416,18 +418,65 @@ module.exports = {
         return {};
     },
 
+    // 辅助方法：发起不经过代理的直接请求
+    _directRequest(url, options) {
+        return new Promise((resolve, reject) => {
+            const urlObj = new URL(url);
+            const protocol = urlObj.protocol === 'https:' ? https : http;
+            
+            const reqOptions = {
+                method: options.method || 'GET',
+                headers: options.headers || {},
+                signal: options.signal
+            };
+
+            const req = protocol.request(url, reqOptions, (res) => {
+                let data = '';
+                res.setEncoding('utf8');
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    resolve({
+                        ok: res.statusCode >= 200 && res.statusCode < 300,
+                        status: res.statusCode,
+                        json: async () => JSON.parse(data),
+                        text: async () => data
+                    });
+                });
+            });
+
+            req.on('error', (err) => {
+                reject(err);
+            });
+
+            if (options.body) {
+                req.write(options.body);
+            }
+            req.end();
+        });
+    },
+
     // 辅助方法：检测服务器连通性
     async _checkConnection(apiBase, apiKey) {
         const baseUrl = this._getBaseUrl(apiBase);
         const endpoint = `${baseUrl}/api/tags`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        let controller;
+        let signal;
+        if (typeof AbortController !== 'undefined') {
+            controller = new AbortController();
+            signal = controller.signal;
+        }
+
+        const timeoutId = setTimeout(() => {
+            if (controller) controller.abort();
+        }, 3000);
 
         try {
-            const response = await fetch(endpoint, {
+            const response = await this._directRequest(endpoint, {
                 method: 'GET',
-                signal: controller.signal,
+                signal: signal,
                 headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
             });
             clearTimeout(timeoutId);
@@ -443,13 +492,21 @@ module.exports = {
         const baseUrl = this._getBaseUrl(apiBase);
         const endpoint = `${baseUrl}/api/tags`;
 
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000);
+        let controller;
+        let signal;
+        if (typeof AbortController !== 'undefined') {
+            controller = new AbortController();
+            signal = controller.signal;
+        }
+
+        const timeoutId = setTimeout(() => {
+            if (controller) controller.abort();
+        }, 5000);
 
         try {
-            const response = await fetch(endpoint, {
+            const response = await this._directRequest(endpoint, {
                 method: 'GET',
-                signal: controller.signal,
+                signal: signal,
                 headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
             });
             clearTimeout(timeoutId);
