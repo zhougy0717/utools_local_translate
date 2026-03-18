@@ -56,15 +56,22 @@ function createCccedictDbWithCli(entries, dbPath) {
 
   const finalSql = setupSql + '\n' + insertStatements.join('\n') + '\nCOMMIT;';
 
-  // 使用 stdin (input) 避免命令行参数过长错误，并设置足够的 maxBuffer
+  // 将 SQL 写出临时文件，通过 .read 解决 Windows 下可能出现的命令行加参数长或编码问题
+  const tempSqlFile = dbPath + '.temp.sql';
+  fs.writeFileSync(tempSqlFile, finalSql, 'utf8');
+
   try {
-    execSync(`sqlite3 "${dbPath}"`, { 
-      input: finalSql,
-      maxBuffer: 100 * 1024 * 1024 // 设置 100MB 缓冲区处理约 12w 条数据
-    });
+    // 使用 .read 能够更稳妥地导入数据，支持 UTF-8
+    // 将路径分隔符转换为 /，避免被部分 sqlite3 版本将 \ 当作转义
+    const safeTempSqlFile = tempSqlFile.replace(/\\/g, '/').replace(/'/g, "''");
+    execSync(`sqlite3 "${dbPath}" ".read '${safeTempSqlFile}'"`);
   } catch (e) {
     console.error('SQLite CLI insert failed:', e.message);
     throw e;
+  } finally {
+    if (fs.existsSync(tempSqlFile)) {
+      fs.unlinkSync(tempSqlFile);
+    }
   }
 }
 
@@ -344,6 +351,8 @@ async function buildCccedict(zipPath, destDir, onProgress) {
       db.run('CREATE INDEX idx_cccedict_s ON cccedict(simplified)');
       db.run('CREATE INDEX idx_cccedict_t ON cccedict(traditional)');
 
+      db.run('BEGIN TRANSACTION');
+
       // 插入数据
       const stmt = db.prepare('INSERT INTO cccedict (simplified, traditional, pinyin, english) VALUES (?, ?, ?, ?)');
 
@@ -352,6 +361,8 @@ async function buildCccedict(zipPath, destDir, onProgress) {
       }
 
       stmt.free();
+
+      db.run('COMMIT');
 
       if (onProgress) onProgress('保存数据库...', 90);
 

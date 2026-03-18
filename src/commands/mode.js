@@ -74,8 +74,17 @@ module.exports = {
             if (mode.id === 'offline_dict') {
                 currentStatus = dictInfo.status;
                 extInfo = dictInfo;
-                if (currentStatus === STATUS.READY) statusText = '(数据已就绪)';
-                else statusText = '(词库未就绪或未配置路径)';
+                if (currentStatus === STATUS.READY) {
+                    statusText = '(数据已就绪)';
+                } else if (currentStatus === STATUS.DOWNLOADED_UNPROCESSED) {
+                    statusText = '(未解压构建，点击处理)';
+                } else if (currentStatus === STATUS.DOWNLOADING) {
+                    statusText = '(下载中断，点击继续)';
+                } else {
+                    // UNAVAILABLE 且没有配置路径
+                    if (!dictInfo.path) statusText = '(未配置路径)';
+                    else statusText = '(词典未下载，按回车键下载)';
+                }
             } else if (mode.id === 'ollama') {
                 const ollamaInfo = getOllamaStatus(appConfig);
                 currentStatus = ollamaInfo.status;
@@ -149,14 +158,27 @@ module.exports = {
 
         if (!itemData.modeId) return {};
 
-        const status = itemData.currentStatus;
+        // 强行从底层同步实时配置，绕过一切潜在的事件循环缓存
+        const liveAppConfig = (typeof utools !== 'undefined' ? utools.dbStorage.getItem('app_config') : null) || appConfig;
+        
+        // 重新动态评估状态，避免由 uTools IPC 传输导致 extInfo 丢失或 currentStatus 过期
+        let status = itemData.currentStatus;
+        let hasResourcePath = false;
+
+        if (itemData.modeId === 'offline_dict') {
+            const dictStatus = getDictStatus(liveAppConfig);
+            status = dictStatus.status;
+            hasResourcePath = !!dictStatus.path;
+        } else if (itemData.modeId === 'ollama') {
+            status = getOllamaStatus(liveAppConfig).status;
+        } else if (itemData.modeId === 'libretranslate') {
+            status = getLibreStatus(liveAppConfig).status;
+        }
 
         if (status === STATUS.UNAVAILABLE) {
             let instructions = [];
             if (itemData.modeId === 'offline_dict') {
                 // 离线词典模式：显示下载选项
-                const hasResourcePath = itemData.extInfo && itemData.extInfo.path;
-
                 if (hasResourcePath) {
                     // 有资源路径但词典文件不存在：显示下载选项
                     instructions = [
@@ -177,10 +199,11 @@ module.exports = {
                         { title: '如何手动配置？', description: '您可以在设置中配置词典绝对路径' }
                     ];
                 } else {
+                    const fallbackPath = liveAppConfig.resourcePath || liveAppConfig.dictRepoPath || '空';
                     // 没有资源路径：显示配置路径选项
                     instructions = [
-                        { title: '缺少词典或未配置路径', description: '您必须在设置中配置词典的绝对路径' },
-                        { title: '如何配置目录？', description: '您可以输入 /path 命令或者在设置页中设置资源路径' }
+                        { title: '缺少词典或未配置路径', description: `如已配置请重试。诊断: 当前检索到的路径 = ${fallbackPath}` },
+                        { title: '如何配置目录？', description: '您可以输入 /path 命令设置数据存储目录' }
                     ];
                 }
             } else if (itemData.modeId === 'ollama') {

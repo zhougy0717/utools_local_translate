@@ -269,39 +269,40 @@ class DictDownloader {
         });
 
         res.on('end', () => {
-          fileStream.end();
-
-          // 如果使用了临时文件，重命名为最终文件名
-          if (writePath === tempPath) {
-            try {
-              // 确保目标文件不存在
-              if (fs.existsSync(destPath)) {
-                fs.unlinkSync(destPath);
+          fileStream.end(() => {
+            // 如果使用了临时文件，重命名为最终文件名
+            if (writePath === tempPath) {
+              try {
+                // 确保目标文件不存在
+                if (fs.existsSync(destPath)) {
+                  fs.unlinkSync(destPath);
+                }
+                fs.renameSync(tempPath, destPath);
+              } catch (e) {
+                console.error('重命名临时文件失败:', e);
               }
-              fs.renameSync(tempPath, destPath);
-            } catch (e) {
-              console.error('重命名临时文件失败:', e);
             }
-          }
 
-          resolve({
-            success: true,
-            path: destPath,
-            resumed: isResume
+            resolve({
+              success: true,
+              path: destPath,
+              resumed: isResume
+            });
           });
         });
 
         res.on('error', (err) => {
-          fileStream.end();
-          // 断点续传模式下，保留临时文件以便下次继续
-          // 只有在非断点续传模式下才删除不完整的文件
-          if (!useTempFile && !isResume && fs.existsSync(destPath)) {
-            fs.unlinkSync(destPath);
-          }
-          resolve({
-            success: false,
-            path: destPath,
-            error: err
+          fileStream.end(() => {
+            // 断点续传模式下，保留临时文件以便下次继续
+            // 只有在非断点续传模式下才删除不完整的文件
+            if (!useTempFile && !isResume && fs.existsSync(destPath)) {
+              fs.unlinkSync(destPath);
+            }
+            resolve({
+              success: false,
+              path: destPath,
+              error: err
+            });
           });
         });
       });
