@@ -209,7 +209,7 @@ if (typeof window !== 'undefined') {
             return;
           }
 
-          let textToCopy = itemData.title;
+          let textToCopy = itemData.copyText || itemData.title;
           if (itemData.title === '词库未就绪' || itemData.title === '未找到释义' || itemData.title === '欢迎使用本地词典') {
             textToCopy = itemData.description;
           }

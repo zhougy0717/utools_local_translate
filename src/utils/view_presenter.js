@@ -1,3 +1,5 @@
+const { splitTextToLines } = require('./text_utils');
+
 /**
  * 组装正常的检索或翻译结果列表
  *
@@ -26,14 +28,34 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
       if (parts.length === 0) {
         list.push({ title: '（无释义）', description: searchWord });
       } else {
-        parts.forEach(en => {
-          list.push({ title: en, description: desc });
+        const sourceLines = splitTextToLines(desc, 80);
+        parts.forEach((en, partIndex) => {
+          const translationLines = splitTextToLines(en, 80);
+          const maxLines = Math.max(translationLines.length, partIndex === 0 ? sourceLines.length : 0);
+
+          for (let i = 0; i < maxLines; i++) {
+            list.push({
+              title: (translationLines[i] || ' ').trim(),
+              description: (partIndex === 0 ? (sourceLines[i] || ' ') : ' ').trim() || ' ',
+              copyText: en
+            });
+          }
         });
       }
     } else {
-      // 英→中：title 为音标+释义，description 为被查词
-      const translationText = [result.phonetic, result.translation].filter(Boolean).join(' ') || '（无释义）';
-      list.push({ title: translationText, description: searchWord });
+      // 英→中 或长自然段：使用分割函数按宽度截断显示
+      const fullTranslationText = [result.phonetic, result.translation].filter(Boolean).join(' ') || '（无释义）';
+      const translationLines = splitTextToLines(fullTranslationText, 80);
+      const sourceLines = splitTextToLines(searchWord, 80);
+      const maxLines = Math.max(translationLines.length, sourceLines.length);
+
+      for (let i = 0; i < maxLines; i++) {
+        list.push({
+          title: (translationLines[i] || ' ').trim(),
+          description: (sourceLines[i] || ' ').trim() || ' ',
+          copyText: fullTranslationText
+        });
+      }
     }
   }
 

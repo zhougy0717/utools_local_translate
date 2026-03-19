@@ -46,9 +46,9 @@ describe('ViewPresenter', () => {
         }, true);
         
         assert.strictEqual(result.length, 3);
-        assert.deepStrictEqual(result[0], { title: 'test', description: 'cè shì · 测试' });
-        assert.deepStrictEqual(result[1], { title: 'trial', description: 'cè shì · 测试' });
-        assert.deepStrictEqual(result[2], { title: 'quiz', description: 'cè shì · 测试' });
+        assert.deepStrictEqual(result[0], { title: 'test', description: 'cè shì · 测试', copyText: 'test' });
+        assert.deepStrictEqual(result[1], { title: 'trial', description: ' ', copyText: 'trial' });
+        assert.deepStrictEqual(result[2], { title: 'quiz', description: ' ', copyText: 'quiz' });
       });
 
       it('should handle missing phonetic', () => {
@@ -58,7 +58,7 @@ describe('ViewPresenter', () => {
         }, true);
         
         assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: 'test', description: '测试' });
+        assert.deepStrictEqual(result[0], { title: 'test', description: '测试', copyText: 'test' });
       });
       
       it('should handle empty translation string safely', () => {
@@ -81,7 +81,7 @@ describe('ViewPresenter', () => {
         }, false);
         
         assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: '[test] 测试', description: 'test' });
+        assert.deepStrictEqual(result[0], { title: '[test] 测试', description: 'test', copyText: '[test] 测试' });
       });
 
       it('should handle missing phonetic', () => {
@@ -91,7 +91,7 @@ describe('ViewPresenter', () => {
         }, false);
         
         assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: '测试', description: 'test' });
+        assert.deepStrictEqual(result[0], { title: '测试', description: 'test', copyText: '测试' });
       });
     });
 
