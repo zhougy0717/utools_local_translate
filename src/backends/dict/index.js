@@ -6,7 +6,7 @@ const path = require('path');
 const fs = require('fs');
 const { DictConfig } = require('./config');
 const { DictDownloader } = require('./downloader');
-const { buildAllDicts, mergeVolumes, buildEcdict } = require('./builder');
+const { buildAllDicts, mergeVolumes, buildEcdict, buildCccedict } = require('./builder');
 
 // 词典状态枚举
 const DICT_STATUS = {
@@ -103,64 +103,91 @@ async function downloadDicts(options) {
 }
 
 /**
- * 从 Gitee 下载并构建 ECDICT 词典 (spec-00024)
+ * 从 Gitee 下载并构建词典 (spec-00024)
+ * ecdict 从 Gitee 分卷下载，cccedict 依然从原路径下载
  * @param {Object} options 选项
  * @param {string} options.destDir 目标目录
  * @param {string} [options.proxy] 代理
  * @param {Function} options.onProgress 进度回调
  * @returns {Promise<Object>} 
  */
-async function downloadEcdictFromGitee(options) {
+async function downloadDictsFromGitee(options) {
   const { destDir, proxy, onProgress } = options;
   if (!destDir) return { success: false, error: new Error('destDir is required') };
 
+  const downloader = new DictDownloader({ destDir, proxy });
+
+  // 1. 处理 ECDICT
   const dbPath = path.join(destDir, 'ecdict.db');
-  if (fs.existsSync(dbPath)) {
-    if (onProgress) onProgress({ percent: 100, downloaded: 1, total: 1 }, 'ecdict');
-    return { success: true, skipped: true };
-  }
+  if (!fs.existsSync(dbPath)) {
+    const zipPath = path.join(destDir, ECDICT_ZIP);
+    const mergedZipPath = path.join(destDir, 'ecdict_merged.zip');
 
-  const zipPath = path.join(destDir, ECDICT_ZIP);
-  const mergedZipPath = path.join(destDir, 'ecdict_merged.zip');
+    if (!fs.existsSync(zipPath) && !fs.existsSync(mergedZipPath)) {
+      // 1.1 下载分卷
+      if (onProgress) onProgress({ dict: 'ecdict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
+      const dlResult = await downloader.downloadVolumes(null, (percent, downloaded, total) => {
+        if (onProgress) onProgress({ dict: 'ecdict', percent, downloaded, total }, 'downloading');
+      });
 
-  if (!fs.existsSync(zipPath) && !fs.existsSync(mergedZipPath)) {
-    const downloader = new DictDownloader({ destDir, proxy });
-    
-    // 1. 下载分卷
-    if (onProgress) onProgress({ dict: 'ecdict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
-    const dlResult = await downloader.downloadVolumes(null, (percent, downloaded, total) => {
-      if (onProgress) onProgress({ dict: 'ecdict', percent, downloaded, total }, 'downloading');
-    });
+      if (!dlResult.success) return dlResult;
 
-    if (!dlResult.success) return dlResult;
+      // 1.2 合并分卷
+      if (onProgress) onProgress('正在合并分卷...', 90, 'ecdict');
+      try {
+        await mergeVolumes(dlResult.paths, mergedZipPath);
+      } catch (err) {
+        return { success: false, error: new Error(`合并分卷失败: ${err.message}`) };
+      }
 
-    // 2. 合并分卷
-    if (onProgress) onProgress('正在合并分卷...', 90, 'ecdict');
-    try {
-      await mergeVolumes(dlResult.paths, mergedZipPath);
-    } catch (err) {
-      return { success: false, error: new Error(`合并分卷失败: ${err.message}`) };
+      // 清理分卷
+      dlResult.paths.forEach(p => {
+        if (fs.existsSync(p)) fs.unlinkSync(p);
+      });
     }
 
-    // 清理分卷
-    dlResult.paths.forEach(p => {
-      if (fs.existsSync(p)) fs.unlinkSync(p);
+    const targetZipPath = fs.existsSync(mergedZipPath) ? mergedZipPath : zipPath;
+
+    // 1.3 构建 (解压并重命名)
+    if (onProgress) onProgress('正在解压与构建...', 95, 'ecdict');
+    const buildResult = await buildEcdict(targetZipPath, destDir, (msg, pct) => {
+      if (onProgress) onProgress(msg, pct, 'ecdict');
     });
+
+    if (targetZipPath === mergedZipPath && fs.existsSync(mergedZipPath)) {
+      fs.unlinkSync(mergedZipPath);
+    }
+
+    if (!buildResult.success) return buildResult;
+  } else {
+    if (onProgress) onProgress({ percent: 100, downloaded: 1, total: 1 }, 'ecdict');
   }
 
-  const targetZipPath = fs.existsSync(mergedZipPath) ? mergedZipPath : zipPath;
+  // 2. 处理 CC-CEDICT
+  const cccedictDbPath = path.join(destDir, 'cccedict.db');
+  if (!fs.existsSync(cccedictDbPath)) {
+    const zipPath = path.join(destDir, CCCEDICT_ZIP);
 
-  // 3. 构建 (解压并重命名)
-  if (onProgress) onProgress('正在解压与构建...', 95, 'ecdict');
-  const buildResult = await buildEcdict(targetZipPath, destDir, (msg, pct) => {
-    if (onProgress) onProgress(msg, pct, 'ecdict');
-  });
+    if (!fs.existsSync(zipPath)) {
+      if (onProgress) onProgress({ dict: 'cccedict', percent: 0, downloaded: 0, total: 0 }, 'downloading');
+      const dlResult = await downloader.downloadCccedict((percent, downloaded, total) => {
+        if (onProgress) onProgress({ dict: 'cccedict', percent, downloaded, total }, 'downloading');
+      });
 
-  if (targetZipPath === mergedZipPath && fs.existsSync(mergedZipPath)) {
-    fs.unlinkSync(mergedZipPath);
+      if (!dlResult.success) return dlResult;
+    }
+
+    if (onProgress) onProgress('正在解压与构建...', 95, 'cccedict');
+    const buildResult = await buildCccedict(path.join(destDir, CCCEDICT_ZIP), destDir, (msg, pct) => {
+      if (onProgress) onProgress(msg, pct, 'cccedict');
+    });
+
+    if (!buildResult.success) return buildResult;
+  } else {
+    if (onProgress) onProgress({ percent: 100, downloaded: 1, total: 1 }, 'cccedict');
   }
 
-  return buildResult;
+  return { success: true };
 }
 
 function createDictBackend(options) {
@@ -373,7 +400,7 @@ module.exports = {
   createDictBackend,
   getDictStatus,
   downloadDicts,
-  downloadEcdictFromGitee,
+  downloadDictsFromGitee,
   buildAllDicts,
   DICT_STATUS
 };

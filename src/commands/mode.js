@@ -1,6 +1,6 @@
 const fs = require('fs');
 const { OllamaConfig } = require('../backends/ollama/config');
-const { getDictStatus: getBackendDictStatus, downloadDicts, downloadEcdictFromGitee, buildAllDicts, DICT_STATUS } = require('../backends/dict');
+const { getDictStatus: getBackendDictStatus, downloadDicts, downloadDictsFromGitee, buildAllDicts, DICT_STATUS } = require('../backends/dict');
 
 const MODES = [
     {
@@ -394,7 +394,7 @@ async function handleDownloadDictFromGitee(_itemData, appConfig, callbackSetList
     }]);
 
     try {
-        const result = await downloadEcdictFromGitee({
+        const result = await downloadDictsFromGitee({
             destDir: repoPath,
             proxy: appConfig.proxy,
             onProgress: (progress, phase) => {
@@ -402,7 +402,7 @@ async function handleDownloadDictFromGitee(_itemData, appConfig, callbackSetList
                   // 处理 builder 返回的消息阶段
                   callbackSetList([{
                       title: progress,
-                      description: `${phase === 'ecdict' ? 'ECDICT' : '词典'} 处理中...`,
+                      description: `${phase === 'ecdict' ? 'ECDICT' : 'CC-CEDICT'} 处理中...`,
                       isCommandContext: true,
                       commandTrigger: 'mode',
                       action: 'download_dict_progress'
@@ -413,9 +413,11 @@ async function handleDownloadDictFromGitee(_itemData, appConfig, callbackSetList
                 const percent = progress.percent || 0;
                 const downloaded = formatBytes(progress.downloaded || 0);
                 const total = formatBytes(progress.total || 0);
+                const dictName = progress.dict === 'ecdict' ? 'ECDICT' : 'CC-CEDICT';
+                const sourceName = progress.dict === 'ecdict' ? 'Gitee 分卷' : '原始路径';
                 
                 callbackSetList([{
-                    title: `正在从 Gitee 下载分卷...`,
+                    title: `正在从 ${sourceName} 下载 ${dictName}...`,
                     description: `${percent}% | 已下载 ${downloaded}/${total}`,
                     isCommandContext: true,
                     commandTrigger: 'mode',
