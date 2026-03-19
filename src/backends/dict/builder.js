@@ -60,11 +60,14 @@ function createCccedictDbWithCli(entries, dbPath) {
   const tempSqlFile = dbPath + '.temp.sql';
   fs.writeFileSync(tempSqlFile, finalSql, 'utf8');
 
+  // 使用 .read 能够更稳妥地导入数据，支持 UTF-8
+  const cwd = path.dirname(dbPath);
+  const dbName = path.basename(dbPath);
+  const tempSqlName = path.basename(tempSqlFile);
+  
   try {
-    // 使用 .read 能够更稳妥地导入数据，支持 UTF-8
-    // 将路径分隔符转换为 /，避免被部分 sqlite3 版本将 \ 当作转义
-    const safeTempSqlFile = tempSqlFile.replace(/\\/g, '/').replace(/'/g, "''");
-    execSync(`sqlite3 "${dbPath}" ".read '${safeTempSqlFile}'"`);
+    const safeTempSqlName = tempSqlName.replace(/'/g, "''");
+    execSync(`sqlite3 "${dbName}" ".read '${safeTempSqlName}'"`, { cwd });
   } catch (e) {
     console.error('SQLite CLI insert failed:', e.message);
     throw e;

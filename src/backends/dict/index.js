@@ -224,9 +224,11 @@ function createDictBackend(options) {
     const { execSync } = require('child_process');
     try {
       const safeWord = word.replace(/"/g, '""');
+      const cwd = path.dirname(dbPath);
+      const dbName = path.basename(dbPath);
       const out = execSync(
-        'sqlite3 "' + dbPath + '" "SELECT translation, phonetic FROM stardict WHERE word = \'' + word.replace(/'/g, "''") + '\' COLLATE NOCASE LIMIT 1;"',
-        { encoding: 'utf-8', maxBuffer: 1024 * 1024 }
+        'sqlite3 "' + dbName + '" "SELECT translation, phonetic FROM stardict WHERE word = \'' + word.replace(/'/g, "''") + '\' COLLATE NOCASE LIMIT 1;"',
+        { cwd, encoding: 'utf-8', maxBuffer: 1024 * 1024 }
       );
       const line = out.trim().split('\n')[0];
       if (!line) {
