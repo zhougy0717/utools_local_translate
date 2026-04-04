@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>离线词典配置</title>
+  <style>
+    :root {
+      --bg-color: #f6f8fa;
+      --card-bg: #ffffff;
+      --text-main: #24292e;
+      --text-secondary: #586069;
+      --border-color: #e1e4e8;
+      --primary-color: #2ea44f;
+      --primary-hover: #2c974b;
+      --input-bg: #fafbfc;
+      --input-border: #d1d5da;
+      --focus-bg: #f8f9fa;
+      --error-color: #cb2431;
+    }
+    
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 32px;
+      height: 100vh;
+      background-color: var(--card-bg);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+      user-select: none;
+      box-sizing: border-box;
+    }
+
+    .card {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    h3 {
+      margin-top: 0;
+      color: var(--text-main);
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--text-main);
+    }
+
+    select, input[type="text"] {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid var(--input-border);
+      border-radius: 6px;
+      background-color: var(--input-bg);
+      font-size: 14px;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    
+    select:focus, input[type="text"]:focus {
+      border-color: #0366d6;
+      box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.3);
+    }
+
+    select {
+      cursor: pointer;
+    }
+
+    .input-grp {
+      display: flex;
+      gap: 8px;
+    }
+
+    .input-grp input {
+      flex-grow: 1;
+      color: var(--text-secondary);
+    }
+
+    input:read-only {
+      background-color: #f3f4f6;
+      cursor: default;
+    }
+
+    button {
+      padding: 8px 16px;
+      background-color: #f3f4f6;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    button:hover {
+      background-color: #e1e4e8;
+    }
+
+    button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    #progressBarContainer {
+      display: none;
+      margin-bottom: 24px;
+      background: var(--focus-bg);
+      padding: 16px;
+      border-radius: 6px;
+      border: 1px dashed var(--input-border);
+    }
+
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .progress-title {
+      color: var(--text-main);
+      font-weight: 500;
+    }
+
+    .progress-stats {
+      color: var(--text-secondary);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .progress-bar-track {
+      width: 100%;
+      background-color: var(--border-color);
+      border-radius: 4px;
+      height: 8px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      width: 0%;
+      background-color: #0366d6;
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-message {
+      margin-top: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .notice {
+      background-color: #f1f8ff;
+      border: 1px solid rgba(3, 102, 214, 0.2);
+      border-radius: 6px;
+      padding: 12px;
+      margin-bottom: 24px;
+      font-size: 13px;
+      line-height: 1.5;
+      display: flex;
+      gap: 10px;
+      color: #24292e;
+      align-items: flex-start;
+    }
+
+    .notice-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    .notice-content strong {
+      color: #0366d6;
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    #errorMessage {
+      display: none;
+      color: var(--error-color);
+      background-color: #ffeef0;
+      border: 1px solid rgba(203, 36, 49, 0.2);
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-bottom: 24px;
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: auto;
+    }
+
+    #btnCancel {
+      background-color: transparent;
+      border: none;
+      color: var(--text-secondary);
+      box-shadow: none;
+    }
+
+    #btnCancel:hover {
+      color: var(--text-main);
+      text-decoration: underline;
+    }
+
+    #btnDownload {
+      background-color: var(--primary-color);
+      color: white;
+      border: 1px solid rgba(27, 31, 35, 0.15);
+      font-weight: 600;
+      padding: 8px 24px;
+    }
+
+    #btnDownload:hover:not(:disabled) {
+      background-color: var(--primary-hover);
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h3>离线词典配置</h3>
+  <div class="subtitle">请选择下载源和数据存储目录</div>
+
+  <div class="notice">
+    <span class="notice-icon">ℹ️</span>
+    <div class="notice-content">
+      <strong>提示：</strong>
+      <span>下载过程中关闭插件窗口会使任务暂停，但支持断点续传。下次进入配置页点击开始即可从上次进度继续。</span>
+    </div>
+  </div>
+  
+  <div id="errorMessage"></div>
+
+  <div class="form-group">
+    <label>下载节点</label>
+    <select id="sourceSelect">
+      <option value="gitee">Gitee (国内推荐 - 分卷快速下载)</option>
+      <option value="github">GitHub (海外节点 - 官方直链)</option>
+    </select>
+  </div>
+  
+  <div class="form-group">
+    <label>数据存储目录</label>
+    <div class="input-grp">
+      <input type="text" id="pathInput" placeholder="请选择存储目录..." readonly>
+      <button id="btnBrowse">浏览...</button>
+    </div>
+  </div>
+  
+  <!-- 进度条区域 -->
+  <div id="progressBarContainer">
+    <div class="progress-header">
+      <span class="progress-title" id="progressTitle">准备下载...</span>
+      <span class="progress-stats" id="progressStats">0%</span>
+    </div>
+    <div class="progress-bar-track">
+      <div class="progress-bar-fill" id="progressFill"></div>
+    </div>
+    <div class="progress-message" id="progressMsg"></div>
+  </div>
+  
+  <div class="actions">
+     <button id="btnCancel">取消</button>
+     <button id="btnDownload">开始下载与部署</button>
+  </div>
+</div>
+
+<script src="./dict-renderer.js"></script>
+</body>
+</html>

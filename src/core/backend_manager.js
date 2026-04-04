@@ -97,12 +97,16 @@ class BackendManager {
   }
 
   /**
-   * 打开 Ollama 设置面板（即使当前未激活 Ollama 后端）
+   * 打开当前激活选项相关的设置面板
    * @param {Function} onCloseCallback 
    */
-  openOllamaConfig(onCloseCallback) {
-    const tempOllama = createOllamaBackend(this.currentConfig.ollama);
-    tempOllama.openConfigPanel(onCloseCallback);
+  openConfigPanel(onCloseCallback) {
+    if (this.activeBackend && typeof this.activeBackend.openConfigPanel === 'function') {
+      this.activeBackend.openConfigPanel(onCloseCallback);
+    } else {
+      console.warn('[BackendManager] activeBackend does not support openConfigPanel');
+      if (typeof onCloseCallback === 'function') onCloseCallback();
+    }
   }
 
   _stopCurrentWorker() {

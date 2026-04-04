@@ -175,167 +175,32 @@ module.exports = {
             status = getLibreStatus(liveAppConfig).status;
         }
 
-        if (status === STATUS.UNAVAILABLE) {
-            let instructions = [];
+        if (status === STATUS.UNAVAILABLE || status === STATUS.DOWNLOADING || status === STATUS.DOWNLOADED_UNPROCESSED) {
             if (itemData.modeId === 'offline_dict') {
-                // 离线词典模式：显示下载选项
-                if (hasResourcePath) {
-                    // 有资源路径但词典文件不存在：显示下载选项
-                    instructions = [
-                        {
-                            title: '从 GitHub 下载 (标准)',
-                            description: '点击开始从 GitHub 下载完整 Zip 压缩包（可能较慢）',
-                            isCommandContext: true,
-                            commandTrigger: 'mode',
-                            action: 'download_dict'
-                        },
-                        {
-                            title: '从 Gitee 下载 (国内极速)',
-                            description: '通过分卷方式从 Gitee 下载（国内推荐，自动合并）',
-                            isCommandContext: true,
-                            commandTrigger: 'mode',
-                            action: 'download_dict_gitee'
-                        },
-                        { title: '如何手动配置？', description: '您可以在设置中配置词典绝对路径' }
-                    ];
-                } else {
-                    const fallbackPath = liveAppConfig.resourcePath || liveAppConfig.dictRepoPath || '空';
-                    // 没有资源路径：显示配置路径选项
-                    instructions = [
-                        { title: '缺少词典或未配置路径', description: `如已配置请重试。诊断: 当前检索到的路径 = ${fallbackPath}` },
-                        { title: '如何配置目录？', description: '您可以输入 /path 命令设置数据存储目录' }
-                    ];
-                }
+                appConfig.backends.offline_dict = true;
+                appConfig.backends.ollama = false;
+                appConfig.backends.libretranslate = false;
+                if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+                return { openConfigPanel: true, reloadBackend: true };
             } else if (itemData.modeId === 'ollama') {
-                instructions = [
-                    { title: 'Ollama 未配置', description: '您需要配置 Ollama 的 API 地址和模型名称才能使用该模式' },
-                    { title: '如何配置？', description: '请输入 /ollama 命令进行配置' }
-                ];
+                appConfig.backends.offline_dict = false;
+                appConfig.backends.ollama = true;
+                appConfig.backends.libretranslate = false;
+                if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+                return { openConfigPanel: true, reloadBackend: true };
             } else if (itemData.modeId === 'libretranslate') {
-                instructions = [
+                let instructions = [
                     { title: 'LibreTranslate 未配置', description: '您需要配置 LibreTranslate 的服务器地址才能使用该模式' },
                     { title: '如何配置？', description: '请输入 /libre 命令进行配置' },
                     { title: '如何部署本地服务器？', description: '点击前往官网查看部署指南 (https://docs.libretranslate.com/)', isCommandContext: true, commandTrigger: 'mode', action: 'open_libre_docs' }
                 ];
-            }
-            if (typeof callbackSetList === 'function') {
-                callbackSetList(instructions);
-            }
-            return { disableClear: true }; // 不做任何后端刷新与搜索恢复
-        }
-
-        // 处理下载中断状态（断点续传）
-        if (status === STATUS.DOWNLOADING) {
-            if (itemData.modeId === 'offline_dict') {
-                callbackSetList([
-                    {
-                        title: '检测到未完成的下载',
-                        description: '点击继续从 GitHub 下载 (如有 Git 缓存)...',
-                        isCommandContext: true,
-                        commandTrigger: 'mode',
-                        action: 'download_dict'
-                    },
-                    {
-                        title: '或切换至 Gitee 下载 (国内推荐/支持续传)',
-                        description: '清除当前任务并尝试分卷下载',
-                        isCommandContext: true,
-                        commandTrigger: 'mode',
-                        action: 'download_dict_gitee'
-                    }
-                ]);
+                if (typeof callbackSetList === 'function') {
+                    callbackSetList(instructions);
+                }
                 return { disableClear: true };
             }
         }
 
-        // 处理已下载未处理状态（自动解压构建）
-        if (status === STATUS.DOWNLOADED_UNPROCESSED) {
-            if (itemData.modeId === 'offline_dict') {
-                // 自动触发解压构建
-                const repoPath = appConfig.resourcePath;
-
-                callbackSetList([{
-                    title: '正在解压和构建词典...',
-                    description: '处理中...',
-                    isCommandContext: true,
-                    commandTrigger: 'mode',
-                    action: 'build_dict_progress'
-                }]);
-
-                buildAllDicts({
-                    repoPath: repoPath,
-                    onProgress: (message, percent, phase) => {
-                        const dictName = phase === 'ecdict' ? 'ECDICT' : 'CC-CEDICT';
-                        callbackSetList([{
-                            title: `正在构建 ${dictName}...`,
-                            description: `${message} ${percent}%`,
-                            isCommandContext: true,
-                            commandTrigger: 'mode',
-                            action: 'build_dict_progress'
-                        }]);
-                    }
-                }).then(buildResult => {
-                    if (buildResult.success) {
-                        const finalStatus = getDictStatus(appConfig);
-
-                        if (finalStatus.status === STATUS.READY) {
-                            appConfig.backends.offline_dict = true;
-                            appConfig.backends.ollama = false;
-                            appConfig.backends.libretranslate = false;
-
-                            if (typeof utools !== 'undefined') {
-                                utools.dbStorage.setItem('app_config', appConfig);
-                            }
-
-                            callbackSetList([{
-                                title: '词典已就绪',
-                                description: '已切换到离线词典模式',
-                                isCommandContext: true,
-                                commandTrigger: 'mode',
-                                modeId: 'offline_dict'
-                            }]);
-                        } else {
-                            // 构建成功但依然不就绪，可能少了某个库
-                            const details = finalStatus.details || {};
-                            const missing = [];
-                            if (!details.ecdict) missing.push('ECDICT');
-                            if (!details.cccedict) missing.push('CC-CEDICT');
-                            
-                            callbackSetList([{
-                                title: '词典构建不完整',
-                                description: `构建完成，但仍缺少: ${missing.join(', ')}。请点击重新下载。`,
-                                isCommandContext: true,
-                                commandTrigger: 'mode',
-                                action: 'download_dict'
-                            }]);
-                        }
-                    } else {
-                        callbackSetList([{
-                            title: '词典构建失败',
-                            description: `原因: ${buildResult.error ? buildResult.error.message : '解压失败'}。可能是压缩包损坏。`,
-                            isCommandContext: true,
-                            commandTrigger: 'mode',
-                            action: 'build_dict_retry_clean'
-                        }, {
-                            title: '尝试重新下载',
-                            description: '删除当前缓存并重新开始下载',
-                            isCommandContext: true,
-                            commandTrigger: 'mode',
-                            action: 'build_dict_retry_clean'
-                        }]);
-                    }
-                }).catch(err => {
-                    callbackSetList([{
-                        title: '词典构建出错',
-                        description: err.message || String(err),
-                        isCommandContext: true,
-                        commandTrigger: 'mode',
-                        action: 'build_dict_retry_clean'
-                    }]);
-                });
-
-                return { disableClear: true };
-            }
-        }
 
         // status === STATUS.READY
         // 变更应用配置

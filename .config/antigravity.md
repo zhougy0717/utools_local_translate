@@ -8,7 +8,7 @@
 
 ##  开发规范
 - 文档采用markdown格式编写
-- 设计文中配图使用plantuml，所有配图要确保没有语法错误，并能被正确渲染
+- 设计文中配图使用plantuml，所有配图要确保没有语法错误，并能被正确渲染。**只在每次绘制或修改 PlantUML 图表后，使用 `plantuml-lint` 技能对当前刚输出的 PlantUML 图表进行针对性检视和修复，不对文档中的其他历史图表进行 linting 操作。**
 - 软件设计要注意合理分层
 - 提交的git commit message要遵从[commit message规范](git_commit_message_规范.md)
 - 设计文档中的原型设计，使用html，直接嵌入markdown文档，以便渲染时直接能查看渲染后的页面效果

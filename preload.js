@@ -71,6 +71,9 @@ if (typeof window !== 'undefined') {
           if (typeof window.hideOllamaConfig === 'function') {
             window.hideOllamaConfig();
           }
+          if (typeof window.hideDictConfig === 'function') {
+            window.hideDictConfig();
+          }
           
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
@@ -94,6 +97,9 @@ if (typeof window !== 'undefined') {
 
           if (typeof window.hideOllamaConfig === 'function') {
             window.hideOllamaConfig();
+          }
+          if (typeof window.hideDictConfig === 'function') {
+            window.hideDictConfig();
           }
 
           if (!searchWord || !searchWord.trim()) {
@@ -143,12 +149,24 @@ if (typeof window !== 'undefined') {
               if (!signal) return;
               console.log('[Preload] Command signal resolved:', signal);
 
-              if (signal.openOllamaConfigPanel) {
-                console.log('[Preload] Opening Ollama config via BackendManager');
-                BackendManager.openOllamaConfig(() => {
-                    console.log('[Preload] Ollama config closed, reloading...');
+              if (signal.openConfigPanel) {
+                console.log('[Preload] Opening config panel via BackendManager');
+                if (signal.reloadBackend) {
+                    appConfig.clearCache();
+                    const newConfig = appConfig.load();
+                    const backendConfig = {
+                        resourcePath: newConfig.resourcePath || '',
+                        proxy: newConfig.proxy || '',
+                        backends: newConfig.backends,
+                        ollama: {},
+                        libretranslate: {}
+                    };
+                    BackendManager.reload(backendConfig);
+                }
+
+                BackendManager.openConfigPanel(() => {
+                    console.log('[Preload] Config panel closed, reloading...');
                     try {
-                        // 清除配置缓存并重新加载
                         appConfig.clearCache();
                         const newConfig = appConfig.load();
                         const backendConfig = {
@@ -166,7 +184,7 @@ if (typeof window !== 'undefined') {
                             }, 10);
                         }
                     } catch (e) {
-                        console.error('[Preload] Error in Ollama config callback:', e);
+                        console.error('[Preload] Error in config callback:', e);
                     }
                 });
                 return;

@@ -201,6 +201,108 @@ function createDictBackend(options) {
 
   // 合并配置
   const config = Object.assign({}, sharedConfigManager.load(), options || {});
+  const openConfigPanelFn = function(onCloseCallback) {
+    if (typeof document === 'undefined') return;
+    if (typeof utools !== 'undefined') utools.setExpendHeight(600);
+
+    const { appConfig } = require('../../utils/app_config');
+
+    window._dictAPI = {
+      chooseDirectory() {
+        if (typeof utools === 'undefined') return null;
+        const result = utools.showOpenDialog({
+          title: '选择词典数据存储目录',
+          properties: ['openDirectory']
+        });
+        return (result && result.length > 0) ? result[0] : null;
+      },
+      getDefaultDirectory() {
+        const cfg = sharedConfigManager.load();
+        const appCfg = appConfig.load();
+        return cfg.dictRepoPath || appCfg.resourcePath || '';
+      },
+      async startDownload(options, onProgress) {
+        sharedConfigManager.save({ dictRepoPath: options.destDir });
+        
+        try {
+          const appCfg = appConfig.load();
+          appCfg.resourcePath = options.destDir;
+          if (typeof utools !== 'undefined') {
+              utools.dbStorage.setItem('app_config', appCfg);
+          }
+          const proxy = appCfg.proxy;
+
+          const downloadOptions = {
+            destDir: options.destDir,
+            proxy: proxy,
+            onProgress(progress, phase) {
+              if (typeof progress === 'string') {
+                  onProgress({ phase: 'building', dict: phase === 'ecdict' ? 'ecdict' : 'cccedict', percent: 90, downloaded: 0, total: 0, message: progress });
+              } else {
+                  onProgress({
+                    phase: 'downloading',
+                    dict: progress.dict || phase,
+                    percent: progress.percent || 0,
+                    downloaded: progress.downloaded || 0,
+                    total: progress.total || 0,
+                    message: ''
+                  });
+              }
+            }
+          };
+
+          const result = options.source === 'gitee' 
+             ? await downloadDictsFromGitee(downloadOptions)
+             : await downloadDicts(downloadOptions);
+
+          return result;
+        } catch (err) {
+          return { success: false, error: err };
+        }
+      },
+      closePanel() {
+        const container = document.getElementById('dict-config-container');
+        if (container) container.remove();
+        delete window._dictAPI;
+        delete window.hideDictConfig;
+
+        if (typeof utools !== 'undefined') utools.setExpendHeight(0);
+        window.focus();
+        if (typeof onCloseCallback === 'function') onCloseCallback();
+      }
+    };
+
+    window.hideDictConfig = window._dictAPI.closePanel;
+
+    let iframeContainer = document.getElementById('dict-config-container');
+    if (!iframeContainer) {
+        iframeContainer = document.createElement('div');
+        iframeContainer.id = 'dict-config-container';
+        iframeContainer.style.position = 'fixed';
+        iframeContainer.style.top = '0';
+        iframeContainer.style.left = '0';
+        iframeContainer.style.width = '100vw';
+        iframeContainer.style.height = '100vh';
+        iframeContainer.style.zIndex = '999999';
+        iframeContainer.style.backgroundColor = '#f6f8fa';
+        
+        const iframe = document.createElement('iframe');
+        const htmlPath = path.resolve(__dirname, 'dict-config.html');
+        let normalizedPath = htmlPath.replace(/\\/g, '/');
+        if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+        const finalUrl = 'file://' + normalizedPath;
+        
+        iframe.src = finalUrl;
+        iframe.style.width = '100%';
+        iframe.style.height = '100%';
+        iframe.style.border = 'none';
+        iframe.style.display = 'block';
+        iframeContainer.appendChild(iframe);
+        document.body.appendChild(iframeContainer);
+    }
+    iframeContainer.style.display = 'block';
+  };
+
   if (!config.dictRepoPath) {
     // 强制要求配置路径
     return {
@@ -211,7 +313,8 @@ function createDictBackend(options) {
       },
       getConfigManager: function() {
         return sharedConfigManager;
-      }
+      },
+      openConfigPanel: openConfigPanelFn
     };
   }
 
@@ -391,7 +494,8 @@ function createDictBackend(options) {
     queryWord,
     getConfigManager: function() {
       return sharedConfigManager;
-    }
+    },
+    openConfigPanel: openConfigPanelFn
   };
 }
 

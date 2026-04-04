@@ -220,13 +220,57 @@ async function buildEcdict(zipPath, destDir, onProgress) {
     const targetPath = path.join(destDir, ECDICT_DB);
     if (dbFile.path !== targetPath) {
       if (fs.existsSync(targetPath)) {
-        fs.unlinkSync(targetPath);
+        try {
+          fs.unlinkSync(targetPath);
+        } catch (e) {
+          console.warn('无法删除旧的 ecdict.db:', e.message);
+        }
       }
-      fs.renameSync(dbFile.path, targetPath);
+      
+      // Windows 下 rename 可能因为文件尚在锁定状态（如杀毒软件检查）而报 EBUSY
+      // 这里采用简单的重试策略
+      let renamed = false;
+      let lastError = null;
+      for (let attempt = 1; attempt <= 5; attempt++) {
+        try {
+          if (fs.existsSync(dbFile.path)) {
+            fs.renameSync(dbFile.path, targetPath);
+            renamed = true;
+            break;
+          } else {
+            // 如果源文件也没了，可能是刚才其实成功了但报错了（罕见情况）
+            if (fs.existsSync(targetPath)) {
+                renamed = true;
+                break;
+            }
+          }
+        } catch (e) {
+          lastError = e;
+          if (e.code === 'EBUSY' || e.code === 'EPERM') {
+            if (onProgress) onProgress(`文件忙，重试中 (${attempt}/5)...`, 80 + attempt);
+            // 等待一段时间再重试
+            await new Promise(resolve => setTimeout(resolve, 500));
+          } else {
+            throw e;
+          }
+        }
+      }
+      
+      if (!renamed) {
+        // 如果最终失败且 stardict.db 还在，尝试复制后删除
+        try {
+          fs.copyFileSync(dbFile.path, targetPath);
+          fs.unlinkSync(dbFile.path);
+        } catch (e) {
+          throw lastError || e;
+        }
+      }
     }
 
     // 删除 zip 文件
-    fs.unlinkSync(zipPath);
+    if (fs.existsSync(zipPath)) {
+      fs.unlinkSync(zipPath);
+    }
 
     if (onProgress) onProgress('完成', 100);
 

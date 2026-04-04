@@ -406,8 +406,8 @@ module.exports = {
         }
 
         if (itemData.action === 'configure_prompt') {
-            // 直接打开 Ollama 配置界面
-            return { openOllamaConfigPanel: true };
+            // 直接打开 Ollama 配置界面 (统一使用 openConfigPanel 信号)
+            return { openConfigPanel: true, reloadBackend: true };
         }
 
         if (itemData.action === 'none') {

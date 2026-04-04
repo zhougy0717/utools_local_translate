@@ -5,8 +5,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-# 项目根目录
-ROOT = Path(__file__).resolve().parent.parent
+# 项目根目录 (由于脚本位置变动，需要向上寻找到项目根目录)
+ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
 RELEASE_DIR = ROOT / "release"
 
 # 需要拷贝到 release 的文件和文件夹
