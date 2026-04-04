@@ -6,7 +6,16 @@ const path = require('path');
 const fs = require('fs');
 const { DictConfig } = require('./config');
 const { DictDownloader } = require('./downloader');
-const { buildAllDicts, mergeVolumes, buildEcdict, buildCccedict } = require('./builder');
+const { 
+  buildAllDicts, 
+  mergeVolumes, 
+  buildEcdict, 
+  buildCccedict,
+  ECDICT_ZIP,
+  CCCEDICT_ZIP,
+  ECDICT_DB,
+  CCCEDICT_DB
+} = require('./builder');
 
 // 词典状态枚举
 const DICT_STATUS = {
@@ -17,9 +26,7 @@ const DICT_STATUS = {
   DOWNLOADED_UNPROCESSED: 'DOWNLOADED_UNPROCESSED'  // 已下载未处理：压缩包已下载但尚未解压转换
 };
 
-// 下载文件名称
-const ECDICT_ZIP = 'ecdict-sqlite-28.zip';
-const CCCEDICT_ZIP = 'cedict_1_0_ts_utf-8_mdbg.zip';
+// 下载文件名称由 builder.js 导出提供
 
 // 共享配置管理器实例
 let sharedConfigManager = null;
@@ -98,8 +105,19 @@ async function downloadDicts(options) {
     proxy
   });
 
-  const result = await downloader.downloadAll(onProgress);
-  return result;
+  const dlResult = await downloader.downloadAll(onProgress);
+  if (!dlResult.success) return dlResult;
+
+  // 补充原本缺失的构建步骤：解压并转换
+  if (onProgress) onProgress('正在解压与构建所有词典...', 90);
+  const buildResult = await buildAllDicts({
+    repoPath: destDir,
+    onProgress: (msg, pct, phase) => {
+      if (onProgress) onProgress(msg, pct, phase);
+    }
+  });
+
+  return buildResult;
 }
 
 /**
@@ -318,83 +336,61 @@ function createDictBackend(options) {
     };
   }
 
-  const dbPath = path.join(config.dictRepoPath, 'ecdict.db');
-  const cccedictDbPath = path.join(config.dictRepoPath, 'cccedict.db');
+  const dbPath = path.join(config.dictRepoPath, ECDICT_DB);
+  const cccedictDbPath = path.join(config.dictRepoPath, CCCEDICT_DB);
 
-  function queryWithSqlJs(word, callback) {
-    try {
+  let sqlPromise = null;
+
+  /**
+   * 内部 SQL.js 初始化助手 (实现单例缓存)
+   */
+  async function _getSqlJs() {
+    if (sqlPromise) return sqlPromise;
+    sqlPromise = (async () => {
       const initSqlJs = require('sql.js');
       const wasmPath = path.join(path.dirname(require.resolve('sql.js')), 'sql-wasm.wasm');
       const wasmBinary = fs.readFileSync(wasmPath);
-      initSqlJs({
-        wasmBinary: wasmBinary
-      }).then(function (SQL) {
-        const fileBuffer = fs.readFileSync(dbPath);
-        const db = new SQL.Database(fileBuffer);
-        const safeWord = word.replace(/'/g, "''");
-        const res = db.exec(
-          "SELECT translation, phonetic FROM stardict WHERE word = '" + safeWord + "' COLLATE NOCASE LIMIT 1"
-        );
-        db.close();
-        if (res.length && res[0].values.length) {
-          const row = res[0].values[0];
-          callback(null, { translation: row[0] || '', phonetic: row[1] || '' });
-        } else {
-          callback(null, null);
-        }
-      }).catch(function (err) {
-        callback(err || new Error('sql.js 加载失败'));
-      });
-    } catch (e) {
-      callback(e);
-    }
+      return await initSqlJs({ wasmBinary });
+    })();
+    return sqlPromise;
   }
 
-  function queryWithCli(word, callback) {
-    const { execSync } = require('child_process');
+  async function queryWithSqlJs(word, callback) {
     try {
-      const safeWord = word.replace(/"/g, '""');
-      const cwd = path.dirname(dbPath);
-      const dbName = path.basename(dbPath);
-      const out = execSync(
-        'sqlite3 "' + dbName + '" "SELECT translation, phonetic FROM stardict WHERE word = \'' + word.replace(/'/g, "''") + '\' COLLATE NOCASE LIMIT 1;"',
-        { cwd, encoding: 'utf-8', maxBuffer: 1024 * 1024 }
+      const SQL = await _getSqlJs();
+      const fileBuffer = fs.readFileSync(dbPath);
+      const db = new SQL.Database(fileBuffer);
+      const safeWord = word.replace(/'/g, "''");
+      const res = db.exec(
+        "SELECT translation, phonetic FROM stardict WHERE word = '" + safeWord + "' COLLATE NOCASE LIMIT 1"
       );
-      const line = out.trim().split('\n')[0];
-      if (!line) {
+      db.close();
+      if (res.length && res[0].values.length) {
+        const row = res[0].values[0];
+        callback(null, { translation: row[0] || '', phonetic: row[1] || '' });
+      } else {
         callback(null, null);
-        return;
       }
-      const parts = line.split('|');
-      callback(null, { translation: parts[0] || '', phonetic: parts[1] || '' });
     } catch (e) {
       callback(e);
     }
   }
 
-  function queryCccedictWithSqlJs(word, callback) {
+  async function queryCccedictWithSqlJs(word, callback) {
     try {
-      const initSqlJs = require('sql.js');
-      const wasmPath = path.join(path.dirname(require.resolve('sql.js')), 'sql-wasm.wasm');
-      const wasmBinary = fs.readFileSync(wasmPath);
-      initSqlJs({
-        wasmBinary: wasmBinary
-      }).then(function (SQL) {
-        const fileBuffer = fs.readFileSync(cccedictDbPath);
-        const db = new SQL.Database(fileBuffer);
-        const stmt = db.prepare('SELECT english, pinyin FROM cccedict WHERE simplified = ? OR traditional = ? LIMIT 1');
-        stmt.bind([word, word]);
-        let row = null;
-        if (stmt.step()) {
-          const obj = stmt.getAsObject();
-          row = { translation: obj.english || '', phonetic: obj.pinyin || '' };
-        }
-        stmt.free();
-        db.close();
-        callback(null, row);
-      }).catch(function (err) {
-        callback(err || new Error('sql.js 加载失败'));
-      });
+      const SQL = await _getSqlJs();
+      const fileBuffer = fs.readFileSync(cccedictDbPath);
+      const db = new SQL.Database(fileBuffer);
+      const stmt = db.prepare('SELECT english, pinyin FROM cccedict WHERE simplified = ? OR traditional = ? LIMIT 1');
+      stmt.bind([word, word]);
+      let row = null;
+      if (stmt.step()) {
+        const obj = stmt.getAsObject();
+        row = { translation: obj.english || '', phonetic: obj.pinyin || '' };
+      }
+      stmt.free();
+      db.close();
+      callback(null, row);
     } catch (e) {
       callback(e);
     }
@@ -475,12 +471,7 @@ function createDictBackend(options) {
     }
 
     function executeEcdictQuery() {
-      try {
-        require('sql.js');
-        queryWithSqlJs(w, onResult);
-      } catch (e) {
-        queryWithCli(w, onResult);
-      }
+      queryWithSqlJs(w, onResult);
     }
 
     if (!fs.existsSync(dbPath)) {
@@ -503,8 +494,5 @@ function createDictBackend(options) {
 module.exports = {
   createDictBackend,
   getDictStatus,
-  downloadDicts,
-  downloadDictsFromGitee,
-  buildAllDicts,
   DICT_STATUS
 };
