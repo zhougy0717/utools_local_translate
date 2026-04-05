@@ -1,21 +1,13 @@
-# SPEC-00029: 精简斜线命令 - 移除 /proxy 入口并整合至配置 UI
+# SPEC-00029: 精简斜线命令 - 移除 /proxy 并重构为自治的代理服务
 
 ## 1. 背景与目标
-目前网络代理配置通过 `/proxy` 斜线命令进入。为了提供更直观的用户体验并精简命令列表，我们计划将代理配置入口直接集成到需要网络环境的“离线词典下载”界面中，并删除 `/proxy` 这一全局命令。
+为了提升系统的可维护性并解耦 UI 渲染与核心业务逻辑，我们将移除全局的 `/proxy` 斜线命令。同时，我们将代理配置入口整合至需要网络支持的“离线词典配置”界面中。通过基于事件驱动的重构，我们将实现后端模块对代理变更的自动感知，并使 `preload.js` 回归其作为“引导程序”的极简职责。
 
 ### 1.1 目标
-- 在“离线词典配置”界面（`dict-config.html`）提供明显的代理设置超链接。
-- 彻底移除 `/proxy` 斜线命令，减少主搜索框的命令堆积。
-- 确保代理配置更改后，后台服务能实时重载配置并生效。
+- **去智化 `preload.js`**：取消其对具体 UI 面板的管理，仅负责初始化核心服务。
+- **UI 整合**：在“离线词典配置”中提供代理配置入口。
 
-## 2. 设计细节
-
-### 2.1 UI 整合 (已初步实现，继续保留)
-由于 `dict-config.html` 已经在顶部包含了一个绿色 Notice 区域及其 `#linkProxy` 超链接，我们将确认并维持这一设计：
-- **位置**：表单顶部，紧随标题下方。
-- **样式**：采用 Notice 警告框样式，绿色背景，黑色文本，包含带下划线的锚点。
-
-<div style="border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px; background-color: #ffffff; margin: 15px 0;">
+<div style="border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px; background-color: #ffffff; margin-bottom: 20px;">
   <h4 style="margin-top: 0; font-size: 14px; color: #586069;">UI 效果预览</h4>
   <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-size: 13px; display: flex; gap: 10px; align-items: flex-start; color: #24292e;">
     <span style="font-size: 16px;">🌐</span>
@@ -26,10 +18,13 @@
   </div>
 </div>
 
-### 2.2 核心架构变更与广播机制 (重写)
-在重构后，系统由“命令式驱动”转变为“事件驱动”，以解除渲染进程与主逻辑之间的直接耦合。
+- **解耦重构**：代理配置界面的打开、关闭与重载逻辑由 `ProxyService` 自主管理，通过广播机制通知其他订阅者（如 `BackendManager`）。
 
-#### 类图 (Architecture)
+## 2. 核心设计
+
+### 2.1 架构模型 (Architecture)
+我们将通过广播订阅模式确保各模块能够自愈地响应配置变更，剥离 `preload.js` 中的业务耦合。
+
 ```plantuml
 @startuml
 interface EventEmitter {
@@ -37,10 +32,18 @@ interface EventEmitter {
   +emit(event, ...args)
 }
 
-class ProxyService {
-  +saveProxyConfig()
-  +closePanel()
+class CoreService {
+  +init()
+  +getProxyService(): ProxyService
 }
+
+class ProxyService {
+  -uiContainer: DOMElement
+  +openPanel()
+  +closePanel()
+  +saveProxyConfig()
+}
+EventEmitter <|-- ProxyService : 广播配置变更
 
 class BackendManager {
   +init(config)
@@ -49,44 +52,72 @@ class BackendManager {
 }
 
 class DictBackend {
-  +queryWord(word, sourceLang, targetLang, callback, progressCallback)
+  +openProxyConfig()
   -proxyConfig
 }
 
-EventEmitter <|-- ProxyService : 继承/组合广播能力
-ProxyService <.. BackendManager : 监听代理变更事件
-ProxyService <.. DictBackend : 订阅配置以获取最新通知
-BackendManager "1" o-- "*" DictBackend : 管理生命周期
+CoreService "1" *-- "1" ProxyService : 生命周期管理
+Preload ..> CoreService : 1. 实例化核心服务
+DictBackend ..> ProxyService : 2. 任务触发 (打开配置)
+ProxyService ..> BackendManager : 3. 广播 (PROX_CONFIG_CHANGED)
 @enduml
 ```
 
-#### 架构变更点：
-1. **去智化 `preload.js`**：取消了 `preload.js` 在 `window.openProxyConfigPanel()` 回调中手动执行 `BackendManager.reload()` 的逻辑。`preload.js` 现在仅作为一个 UI 路由，不再感知配置与后端的绑定逻辑。
-2. **事件源中心化 (`ProxyService`)**：`ProxyService` 负责维护代理状态并在配置变动（保存/关闭面板）时发出 `PROXY_CONFIG_CHANGED` 广播。
-3. **主动依赖 (`DictBackend` & `BackendManager`)**：`BackendManager` 或正在工作的词典后端现在需要感知 `ProxyService` 指送的事件，从而实现自我更新或即时重载，保持代理状态同步。
+### 2.2 关键架构变更点：
+1. **职责迁移**：原本在 `preload.js` 中的 `window.openProxyConfigPanel` 及相关 DOM 操作代码迁移至 `ProxyService` 类中，使代理功能实现“自描述、自管理”。
+2. **引导程序简化**：`preload.js` 的 `select` 函数中不再包含任何打开代理界面的信号判断逻辑。
+3. **事件驱动重载**：`BackendManager` 在初始化时向 `ProxyService` 订阅变更事件，从而在代理变更时自动触发全局 `reload()`，无需 `preload.js` 在回调中显式介入。
 
-### 2.3 逻辑处理流
-1. **渲染进程 (`dict-renderer.js`)**：
-   - 监听 `#linkProxy` 的点击事件。
-   - 调用 `window.parent._dictAPI.openProxyConfig()`。
-2. **后端支撑 (`src/backends/dict/index.js`)**：
-   - `_dictAPI` 暴露 `openProxyConfig()` 函数。
-   - 该函数调用主窗口环境下的 `window.openProxyConfigPanel()`。
-3. **主入口 (`preload.js`)**：
-   - `window.openProxyConfigPanel()` 注入存放 `proxy-config.html` 的 iframe。
-   - **[变更点]** 面板关闭后不再执行回调，仅仅是纯粹的 UI 卸载。
-4. **事件闭环**：
-   - `ProxyService` 发出 `proxy-changed` 广播 -> `BackendManager` 监听到 -> 执行 `this.reload()`，将最新的代理参数同步至各个翻译子模块。
+### 2.3 交互时序 (Sequence Diagram)
+通过时序图可以明确 `preload.js` 在整个生命周期中仅在启动阶段参与，后续的 UI 挂载与业务重载均由服务组件自主完成。
 
-### 2.3 命令卸载流程
-- **`src/commands/index.js`**：移除 `const proxyCommand = require('./proxy.js')` 以及 `COMMANDS` 数组中的 `proxyCommand`。
-- **文件系统**：删除 `src/commands/proxy.js`（彻底移除该命令的逻辑定义）。
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
 
-## 3. 测试重点
-- [ ] 确保点击“配置全局代理”链接能成功弹出代理设置浮窗。
-- [ ] 验证在代理浮窗中修改并保存配置后，返回词典下载页时，下载操作能正确使用新代理（即后端已成功 reload）。
-- [ ] 验证输入 `/` 时，命令列表中不再出现 `/proxy` 命令。
-- [ ] 验证 `/mode` -> 选择 `离线词典` 被引导至配置页时，代理引导入口依然有效。
+actor User
+participant "DictRenderer (Iframe)" as UI_Dict
+participant "DictBackend" as Dict
+participant "ProxyService" as Proxy
+participant "ProxyRenderer (Iframe)" as UI_Proxy
+participant "BackendManager" as Manager
 
-## 4. 后续规划
-- 在后续迭代中，计划为 **Ollama** 和 **LibreTranslate** 的配置界面添加类似的代理入口链接，确保各个后端都能方便地进行网络调试。
+== 界面拉起 ==
+User -> UI_Dict : 点击 "配置全局代理"
+UI_Dict -> Dict : api.openProxyConfig()
+Dict -> Proxy : openPanel()
+Proxy -> Proxy : 挂载 Iframe 容器 (DOM 操作)
+Proxy --> User : 显示代理配置界面
+
+== 配置操作与广播 ==
+User -> UI_Proxy : 修改并点击 "保存并测试"
+UI_Proxy -> Proxy : saveProxyConfig(config)
+Proxy -> Proxy : 持久化配置
+Proxy -[#red]> Manager : [EVENT] PROX_CONFIG_CHANGED
+Manager -> Manager : reload() : 自动感知并重构后端实例
+
+== 界面关闭 ==
+User -> UI_Proxy : 点击 "关闭"
+UI_Proxy -> Proxy : closePanel()
+Proxy -> Proxy : 卸载 Iframe 容器 (DOM 移除)
+Proxy --> User : 返回词典配置页
+@enduml
+```
+
+### 2.4 逻辑处理流
+1. **引导初始化**：`preload.js` 启动 -> 调用 `coreService.init()` -> `ProxyService` 实例化。
+2. **用户点击**：词典配置页点击链接 -> `_dictAPI.openProxyConfig()` (由 `DictBackend` 提供接口) -> 调用 `proxyService.openPanel()`。
+3. **UI 渲染**：`ProxyService` 动态创建 iframe 容器并挂载至 `document.body`。
+4. **配置保存**：用户在 Iframe 中保存配置 -> `ProxyService.saveProxyConfig()` 被触发 -> **广播 `PROXY_CONFIG_CHANGED` 事件**。
+5. **系统重载**：`BackendManager` 监听到事件 -> 自动执行 `this.reload()` 刷新整个后端的代理环境。
+6. **面板关闭**：调用 `proxyService.closePanel()` -> 清理 DOM，不涉及业务回调。
+
+## 3. 命令卸载
+- **清理引用**：从 `src/commands/index.js` 移除 `proxyCommand` 注册。
+- **物理删除**：逻辑迁移完成后，彻底删除 `src/commands/proxy.js`。
+
+## 4. 测试重点
+- [ ] 验证 `preload.js` 启动后是否有报错，是否符合极简化的要求。
+- [ ] 验证点击词典下载页的代理链接，是否能正确触发 `ProxyService.openPanel()` 并显示界面。
+- [ ] 验证代理面板关闭后，控制台是否能看到 `BackendManager` 触发的自动重载日志。
+- [ ] 验证输入 `/` 后，建议列表中不再出现 `代理设置` 项。
