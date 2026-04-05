@@ -140,7 +140,36 @@ module.exports = {
     },
 
     handleSelect(itemData, appConfig, callbackSetList) {
-        // 1. 处理 Ollama 的子命令导航逻辑 (导航组织模式，而非仅为确认)
+        // 1.1 处理离线词典的二级确认逻辑 (spec-00033)
+        if (itemData.modeId === 'offline_dict' && !itemData.action) {
+            const liveAppConfig = (typeof utools !== 'undefined' ? utools.dbStorage.getItem('app_config') : null) || appConfig;
+            const dictInfo = getDictStatus(liveAppConfig);
+            const statusText = dictInfo.status === STATUS.READY ? '✅ 数据已就绪' : '⚠️ 数据未就绪';
+            
+            callbackSetList([
+                {
+                    title: '确认启用离线词典翻译模式',
+                    description: `当前状态: ${statusText} — ECDICT 万词库，极速本地响应`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'offline_dict',
+                    action: 'confirm_dict',
+                    icon: Icons.DICT
+                },
+                {
+                    title: '打开离线词典配置面板',
+                    description: `⚙️ 管理词典数据与下载状态`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'offline_dict',
+                    action: 'open_dict_config',
+                    icon: Icons.DICT
+                }
+            ]);
+            return { disableClear: true };
+        }
+
+        // 1.2 处理 Ollama 的子命令导航逻辑 (导航组织模式，而非仅为确认)
         if (itemData.modeId === 'ollama' && !itemData.action) {
             const configManager = new OllamaConfig();
             const config = configManager.load();
@@ -154,7 +183,8 @@ module.exports = {
                     isCommandContext: true,
                     commandTrigger: 'mode',
                     modeId: 'ollama',
-                    action: 'confirm_ollama'
+                    action: 'confirm_ollama',
+                    icon: Icons.OLLAMA
                 },
                 {
                     title: '打开 Ollama 配置面板',
@@ -162,13 +192,31 @@ module.exports = {
                     isCommandContext: true,
                     commandTrigger: 'mode',
                     modeId: 'ollama',
-                    action: 'open_ollama_config'
+                    action: 'open_ollama_config',
+                    icon: Icons.OLLAMA
                 }
             ]);
             return { disableClear: true };
         }
 
-        // 2. 处理具体的子操作
+        // 2.1 处理离线词典的具体子操作
+        if (itemData.action === 'confirm_dict') {
+            appConfig.backends.offline_dict = true;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = false;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+            return { reloadBackend: true, restoreSearch: true };
+        }
+
+        if (itemData.action === 'open_dict_config') {
+            appConfig.backends.offline_dict = true;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = false;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+            return { openConfigPanel: true, reloadBackend: true };
+        }
+
+        // 2.2 处理 Ollama 的具体子操作
         if (itemData.action === 'confirm_ollama') {
             appConfig.backends.offline_dict = false;
             appConfig.backends.ollama = true;
@@ -226,9 +274,13 @@ module.exports = {
                 // 这两者支持内置配置面板
                 return { openConfigPanel: true, reloadBackend: true };
             } else if (itemData.modeId === 'libretranslate') {
-                // LibreTranslate 目前仅提示指令
+                // LibreTranslate 目前仅提示指令 (spec-00032)
                 callbackSetList([
-                    { title: '配置 LibreTranslate', description: '设置服务器地址与 API Key (/libre <url> [key])' }
+                    { 
+                        title: '配置 LibreTranslate', 
+                        description: '设置服务器地址与 API Key (/libre <url> [key])',
+                        icon: Icons.LIBRE
+                    }
                 ]);
                 return { disableClear: true };
             }
