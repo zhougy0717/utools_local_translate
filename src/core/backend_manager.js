@@ -1,13 +1,14 @@
 const { createDictBackend } = require('../backends/dict/index.js');
 const { createOllamaBackend } = require('../backends/ollama/index.js');
 const { createLibreTranslateBackend } = require('../backends/libretranslate/index.js');
-
 const { appConfig } = require('../utils/app_config');
+const { coreService } = require('./core_service');
 
 class BackendManager {
   constructor() {
     this.activeBackend = null;
     this.currentConfig = null;
+    this._proxyListenerAdded = false;
   }
 
   /**
@@ -16,6 +17,38 @@ class BackendManager {
    */
   init(config) {
     this.currentConfig = config;
+
+    // 订阅代理变更事件 (仅注册一次)
+    if (!this._proxyListenerAdded) {
+      const proxyService = coreService.getProxyService();
+      if (proxyService) {
+        proxyService.on(proxyService.EVENT_PROXY_CONFIG_CHANGED, () => {
+          console.log('[BackendManager] Detected proxy change, triggering auto-reload...');
+          // 重新读取配置并重载
+          const updatedConfig = Object.assign({}, this.currentConfig, {
+            proxy: appConfig.getProxy()
+          });
+          this.reload(updatedConfig);
+        });
+        this._proxyListenerAdded = true;
+      }
+    }
+
+    // 订阅代理变更事件 (仅注册一次)
+    if (!this._proxyListenerAdded) {
+      const proxyService = coreService.getProxyService();
+      if (proxyService) {
+        proxyService.on(proxyService.EVENT_PROXY_CONFIG_CHANGED, () => {
+          console.log('[BackendManager] Detected proxy change, triggering auto-reload...');
+          // 重新读取配置并重载
+          const updatedConfig = Object.assign({}, this.currentConfig, {
+            proxy: appConfig.getProxy()
+          });
+          this.reload(updatedConfig);
+        });
+        this._proxyListenerAdded = true;
+      }
+    }
 
     // 应用代理设置
     const proxyStr = appConfig.getProxy();

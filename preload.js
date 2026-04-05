@@ -29,52 +29,6 @@ const backendConfig = {
 BackendManager.init(backendConfig);
 coreService.init(); // 初始化核心业务服务并注入 _proxyAPI 到 window
 
-  window.openProxyConfigPanel = function(onCloseCallback) {
-    const path = require('path');
-    if (typeof utools !== 'undefined') utools.setExpendHeight(600);
-
-
-    // 此时 window._proxyAPI 已经由 coreService.init() 注入，但我们仍需关联销毁回调
-    const proxyService = coreService.getProxyService();
-    
-    window._closeProxyConfigPanel = function() {
-        const container = document.getElementById('proxy-config-container');
-        if (container) container.remove();
-        
-        if (typeof utools !== 'undefined') utools.setExpendHeight(0);
-        window.focus();
-        if (typeof onCloseCallback === 'function') onCloseCallback();
-    };
-
-    window.hideProxyConfig = proxyService.closePanel.bind(proxyService);
-
-    let iframeContainer = document.getElementById('proxy-config-container');
-    if (!iframeContainer) {
-        iframeContainer = document.createElement('div');
-        iframeContainer.id = 'proxy-config-container';
-        iframeContainer.style.position = 'fixed';
-        iframeContainer.style.top = '0';
-        iframeContainer.style.left = '0';
-        iframeContainer.style.width = '100vw';
-        iframeContainer.style.height = '100vh';
-        iframeContainer.style.zIndex = '999999';
-        iframeContainer.style.backgroundColor = '#f8fafc';
-        
-        const iframe = document.createElement('iframe');
-        const htmlPath = path.resolve(__dirname, 'src/config/proxy-config.html');
-        let normalizedPath = htmlPath.replace(/\\/g, '/');
-        if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
-        iframe.src = 'file://' + normalizedPath;
-        iframe.style.width = '100%';
-        iframe.style.height = '100%';
-        iframe.style.border = 'none';
-        iframe.style.display = 'block';
-        iframeContainer.appendChild(iframe);
-        document.body.appendChild(iframeContainer);
-    }
-    iframeContainer.style.display = 'block';
-  };
-
 if (typeof window !== 'undefined') {
   window.stopLocalWorker = BackendManager.stop.bind(BackendManager);
 }
@@ -146,8 +100,9 @@ if (typeof window !== 'undefined') {
           if (typeof window.hideOllamaConfig === 'function') {
             window.hideOllamaConfig();
           }
-          if (typeof window.hideProxyConfig === 'function') {
-            window.hideProxyConfig();
+          const proxyService = coreService.getProxyService();
+          if (proxyService && typeof proxyService.closePanel === 'function') {
+            proxyService.closePanel();
           }
 
           if (!searchWord || !searchWord.trim()) {
@@ -197,23 +152,6 @@ if (typeof window !== 'undefined') {
               if (!signal) return;
               console.log('[Preload] Command signal resolved:', signal);
 
-              if (signal.openProxyConfigPanel) {
-                console.log('[Preload] Opening proxy config panel');
-                window.openProxyConfigPanel(() => {
-                    console.log('[Preload] Proxy config panel closed, reloading...');
-                    appConfig.clearCache();
-                    const newConfig = appConfig.load();
-                    const backendConfig = {
-                        resourcePath: newConfig.resourcePath || '',
-                        proxy: appConfig.getProxy(),
-                        backends: newConfig.backends,
-                        ollama: {},
-                        libretranslate: {}
-                    };
-                    BackendManager.reload(backendConfig);
-                });
-                return;
-              }
 
               if (signal.openConfigPanel) {
                 console.log('[Preload] Opening config panel via BackendManager');

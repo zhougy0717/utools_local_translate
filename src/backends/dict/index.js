@@ -289,8 +289,12 @@ function createDictBackend(options) {
         if (typeof onCloseCallback === 'function') onCloseCallback();
       },
       openProxyConfig() {
-        if (typeof window.openProxyConfigPanel === 'function') {
-            window.openProxyConfigPanel();
+        const { coreService } = require('../../core/core_service');
+        const proxyService = coreService.getProxyService();
+        if (proxyService && typeof proxyService.openPanel === 'function') {
+            proxyService.openPanel();
+        } else {
+            console.error('[DictBackend] ProxyService.openPanel not available');
         }
       }
     };

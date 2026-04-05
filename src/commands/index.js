@@ -1,14 +1,12 @@
 const modeCommand = require('./mode.js');
 const pathCommand = require('./path.js');
 const ollamaCommand = require('./ollama.js');
-const proxyCommand = require('./proxy.js');
 const libreCommand = require('./libre.js');
 
 // 注册激活的所有命令
 const COMMANDS = [
     modeCommand,
     pathCommand,
-    proxyCommand,
     ollamaCommand,
     libreCommand
 ];

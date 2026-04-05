@@ -1,18 +1,25 @@
 const { appConfig } = require('../utils/app_config');
 const { HttpsProxyAgent } = require('https-proxy-agent');
+const EventEmitter = require('events');
+const path = require('path');
 
 /**
  * 代理核心业务模块 (ProxyService)
  * 承担所有的配置存取、加密存储映射以及网络连接探测职责
+ * 同时负责代理配置界面的渲染与关闭 (UI 自治)
  * 实现接口: _proxyAPI
  */
-class ProxyService {
+class ProxyService extends EventEmitter {
   /**
    * @param {CoreService} core 
    */
   constructor(core) {
+    super();
     this.core = core;
     this._fetch = null;
+    
+    // 定义常量
+    this.EVENT_PROXY_CONFIG_CHANGED = 'PROX_CONFIG_CHANGED';
   }
 
   /**
@@ -64,6 +71,10 @@ class ProxyService {
   async saveProxyConfig(config, password) {
     // 调用 AppConfig 负责基本数据的保存和密码加密存取
     appConfig.saveProxyConfig(config, password);
+    
+    // 广播配置变更事件
+    this.emit(this.EVENT_PROXY_CONFIG_CHANGED, { config });
+    
     return { success: true };
   }
 
@@ -128,13 +139,75 @@ class ProxyService {
   }
 
   /**
+   * 打开配置面板 (UI 自治实现)
+   * 原逻辑从 preload.js 迁移至此，确保 preload.js 保持极简
+   */
+  openPanel() {
+    if (typeof utools !== 'undefined') {
+      utools.setExpendHeight(600);
+    }
+
+    // 1. 如果已存在则先移除
+    this._removeExistingPanel();
+
+    // 2. 创建容器
+    const iframeContainer = document.createElement('div');
+    iframeContainer.id = 'proxy-config-container';
+    Object.assign(iframeContainer.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100vw',
+      height: '100vh',
+      zIndex: '999999',
+      backgroundColor: '#f8fafc'
+    });
+
+    // 3. 创建 Iframe
+    const iframe = document.createElement('iframe');
+    const htmlPath = path.resolve(__dirname, '../config/proxy-config.html');
+    let normalizedPath = htmlPath.replace(/\\/g, '/');
+    if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+    
+    iframe.src = 'file://' + normalizedPath;
+    Object.assign(iframe.style, {
+      width: '100%',
+      height: '100%',
+      border: 'none',
+      display: 'block'
+    });
+
+    iframeContainer.appendChild(iframe);
+    document.body.appendChild(iframeContainer);
+  }
+
+  /**
+   * 内部私有方法：清理残留 DOM
+   */
+  _removeExistingPanel() {
+    const container = document.getElementById('proxy-config-container');
+    if (container) {
+      container.remove();
+    }
+  }
+
+  /**
    * 关闭配置面板
    * 接口映射: UI 进程调用
    */
   closePanel() {
-    if (typeof window !== 'undefined' && typeof window._closeProxyConfigPanel === 'function') {
-      window._closeProxyConfigPanel();
+    this._removeExistingPanel();
+    
+    if (typeof utools !== 'undefined') {
+      utools.setExpendHeight(0);
     }
+    
+    if (typeof window !== 'undefined') {
+      window.focus();
+    }
+
+    // 面板关闭通常意味着配置流程结束，发出广播以确保后端同步
+    this.emit(this.EVENT_PROXY_CONFIG_CHANGED);
   }
 }
 
