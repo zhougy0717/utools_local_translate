@@ -16,23 +16,10 @@ class BackendManager {
    * @param {Object} config - 包含后端的配置信息
    */
   init(config) {
+    // 强制清理遗留的 UI，确保后端切换时界面不会重叠
+    this.closeCurrentConfigPanel();
+    
     this.currentConfig = config;
-
-    // 订阅代理变更事件 (仅注册一次)
-    if (!this._proxyListenerAdded) {
-      const proxyService = coreService.getProxyService();
-      if (proxyService) {
-        proxyService.on(proxyService.EVENT_PROXY_CONFIG_CHANGED, () => {
-          console.log('[BackendManager] Detected proxy change, triggering auto-reload...');
-          // 重新读取配置并重载
-          const updatedConfig = Object.assign({}, this.currentConfig, {
-            proxy: appConfig.getProxy()
-          });
-          this.reload(updatedConfig);
-        });
-        this._proxyListenerAdded = true;
-      }
-    }
 
     // 订阅代理变更事件 (仅注册一次)
     if (!this._proxyListenerAdded) {
@@ -142,6 +129,39 @@ class BackendManager {
     } else {
       console.warn('[BackendManager] activeBackend does not support openConfigPanel');
       if (typeof onCloseCallback === 'function') onCloseCallback();
+    }
+  }
+
+  /**
+   * 关闭当前加载的设置面板（如果有）
+   * @param {boolean} isSilent 是否静默关闭（例如在搜索触发时，不需要重置高度或归还焦点）
+   */
+  closeCurrentConfigPanel(isSilent = false) {
+    // 1. 关闭后端相关的配置面板
+    if (this.activeBackend && typeof this.activeBackend.closePanel === 'function') {
+      this.activeBackend.closePanel(isSilent);
+    }
+    
+    // 2. 强力清理
+    const containerIds = ['ollama-config-container', 'dict-config-container', 'proxy-config-container'];
+    containerIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    });
+
+    // 3. 清理全局 API 钩子
+    delete window._ollamaAPI;
+    delete window._dictAPI;
+    
+    // 4. 清理旧式钩子
+    if (typeof window.hideOllamaConfig === 'function') window.hideOllamaConfig();
+    if (typeof window.hideProxyConfig === 'function') window.hideProxyConfig();
+
+    // 5. 这里的 _closeConfigPanel 由外部注入
+    if (typeof window._closeConfigPanel === 'function') {
+        const temp = window._closeConfigPanel;
+        delete window._closeConfigPanel;
+        temp(isSilent);
     }
   }
 

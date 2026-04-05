@@ -1,0 +1,64 @@
+<h2>词典下载界面中的代理入口设计</h2>
+<p class="subtitle">我们已经添加了超链接，现在讨论其位置和形式是否需要进一步优化，以及移除 /proxy 命令的影响。</p>
+
+<div class="options">
+  <div class="option" data-choice="top-notice" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>顶部提示框 (当前设计)</h3>
+      <p>在界面顶部显示一个绿色的 Notice 区域，包含“配置全局代理”链接。这种方式最显眼，适合在下载前引导用户检查网络。</p>
+      <div class="mockup" style="margin-top: 10px;">
+        <div class="mockup-header">离线词典配置</div>
+        <div class="mockup-body" style="padding: 15px;">
+           <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 10px; border-radius: 6px; font-size: 13px; display: flex; gap: 8px;">
+             <span>🌐</span>
+             <div>
+               <strong>网络代理：</strong>
+               <span>如遇下载缓慢或失败，请尝试 <a href="#" style="color: #166534; font-weight: 600; text-decoration: underline;">配置全局代理</a>。</span>
+             </div>
+           </div>
+           <div style="margin-top: 15px; background: #eee; height: 30px; border-radius: 4px; opacity: 0.5;"></div>
+           <div style="margin-top: 10px; background: #eee; height: 30px; border-radius: 4px; opacity: 0.5;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="bottom-action" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>底部操作区链接 (更克制)</h3>
+      <p>将代理配置链接放在“开始下载”按钮旁边，或在底部以次要按钮/链接形式存在。视觉干扰较小，适合认为代理配置是“备选方案”的场景。</p>
+      <div class="mockup" style="margin-top: 10px;">
+        <div class="mockup-header">离线词典配置</div>
+        <div class="mockup-body" style="padding: 15px; display: flex; flex-direction: column;">
+           <div style="flex: 1; min-height: 80px; background: #f9f9f9; border-radius: 4px; opacity: 0.5;"></div>
+           <div style="margin-top: 15px; display: flex; align-items: center; justify-content: flex-end; gap: 12px;">
+             <a href="#" style="font-size: 13px; color: #586069; text-decoration: underline;">代理设置</a>
+             <button style="padding: 6px 12px; background: #2ea44f; color: white; border: none; border-radius: 4px; font-weight: 600;">开始下载</button>
+           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>后续计划：移除 /proxy 命令</h3>
+  <div class="pros-cons">
+    <div class="pros">
+      <h4>优点</h4>
+      <ul>
+        <li>精简了主命令空间，不再对普通用户暴露“高级”配置。</li>
+        <li>保持了 UI 驱动的交互风格，减少了对 Slash 命令的依赖。</li>
+      </ul>
+    </div>
+    <div class="cons">
+      <h4>风险 (待确认)</h4>
+      <ul>
+        <li><strong>其他翻译模式：</strong> 如果用户当前使用 Ollama 且需要代理，目前尚未在 Ollama 配置界面提供入口。</li>
+        <li><strong>已开启代理无法关闭：</strong> 移除命令后，如果用户想关闭代理，必须先进入离线词典配置页。</li>
+      </ul>
+    </div>
+  </div>
+</div>

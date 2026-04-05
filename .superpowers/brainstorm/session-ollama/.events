@@ -1,0 +1,4 @@
+{"type":"click","text":"B\n    \n      增强确认 (带状态检测)\n      1. 确认启动 (正在检查状态...) - 实时告诉你 Ollama 是否在线\n      2. 打开详细配置界面\n      3. (可选) 快速切换模型 (列出常用模型)\n      反馈更明确","choice":"enhanced","id":null,"timestamp":1775355402165}
+{"type":"click","text":"B\n    \n      增强确认 (带状态检测)\n      1. 确认启动 (正在检查状态...) - 实时告诉你 Ollama 是否在线\n      2. 打开详细配置界面\n      3. (可选) 快速切换模型 (列出常用模型)\n      反馈更明确","choice":"enhanced","id":null,"timestamp":1775355405814}
+{"type":"click","text":"B\n    \n      增强确认 (带状态检测)\n      1. 确认启动 (正在检查状态...) - 实时告诉你 Ollama 是否在线\n      2. 打开详细配置界面\n      3. (可选) 快速切换模型 (列出常用模型)\n      反馈更明确","choice":"enhanced","id":null,"timestamp":1775355405992}
+{"type":"click","text":"A\n    \n      当前实现 (两项式)\n      1. 确认启用 Ollama 翻译模式\n      2. 打开 Ollama 配置面板\n      简单直接","choice":"current","id":null,"timestamp":1775355432674}

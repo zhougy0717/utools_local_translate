@@ -69,13 +69,8 @@ if (typeof window !== 'undefined') {
       args: {
         placeholder: '输入单词或中文查词',
         enter: function (action, callbackSetList) {
-          // 清除任何可能遗留的配置面板
-          if (typeof window.hideOllamaConfig === 'function') {
-            window.hideOllamaConfig();
-          }
-          if (typeof window.hideProxyConfig === 'function') {
-            window.hideProxyConfig();
-          }
+          // 统一清理：确保关闭任何可能遗留的配置面板（实现零感知解耦）
+          BackendManager.closeCurrentConfigPanel();
           
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
@@ -97,13 +92,8 @@ if (typeof window !== 'undefined') {
             searchTimeout = null;
           }
 
-          if (typeof window.hideOllamaConfig === 'function') {
-            window.hideOllamaConfig();
-          }
-          const proxyService = coreService.getProxyService();
-          if (proxyService && typeof proxyService.closePanel === 'function') {
-            proxyService.closePanel();
-          }
+          // 统一清理：移除当前挂载的所有动态 UI 容器（静默模式，防止输入框首个字符被吞）
+          BackendManager.closeCurrentConfigPanel(true);
 
           if (!searchWord || !searchWord.trim()) {
             callbackSetList([]);

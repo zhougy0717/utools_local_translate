@@ -62,6 +62,7 @@ class OllamaBackend {
         const payload = {
             model: this.config.model,
             temperature: this.config.temperature,
+            stream: false,
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: text }
@@ -83,9 +84,18 @@ class OllamaBackend {
             fetchOptions.signal = this.currentAbortController.signal;
         }
 
-        const endpoint = `${this.config.apiBase}/chat/completions`;
+        let apiBase = (this.config.apiBase || '').trim().replace(/\/+$/, '');
+        if (apiBase && !apiBase.endsWith('/v1')) {
+            apiBase += '/v1';
+        }
+        const endpoint = `${apiBase}/chat/completions`;
 
-        this._directRequest(endpoint, fetchOptions)
+        // 根据 useProxy 决定请求方式：true 则使用全局（由系统代理或 fetch 自动处理），false 则强制直连
+        const requestPromise = this.config.useProxy 
+            ? fetch(endpoint, fetchOptions)
+            : this._request(endpoint, fetchOptions);
+
+        requestPromise
             .then(res => {
                 if (!res.ok) {
                     throw new Error(`HTTP 异常状态码: ${res.status}`);
@@ -131,44 +141,59 @@ class OllamaBackend {
     }
 
     /**
-     * 发起不经过代理的直接请求
-     * 解决局域网/本地服务被代理拦截的问题
+     * 发起基础网络请求 (如果 options 包含强制直连逻辑则跳过系统代理)
      */
-    _directRequest(url, options) {
+    _request(url, options) {
         return new Promise((resolve, reject) => {
-            const urlObj = new URL(url);
-            const protocol = urlObj.protocol === 'https:' ? https : http;
-            
-            const reqOptions = {
-                method: options.method || 'GET',
-                headers: options.headers || {},
-                signal: options.signal
-            };
+            try {
+                const urlObj = new URL(url);
+                const protocol = urlObj.protocol === 'https:' ? https : http;
+                
+                const headers = Object.assign({}, options.headers || {});
+                if (options.body) {
+                    headers['Content-Length'] = Buffer.byteLength(options.body);
+                }
 
-            const req = protocol.request(url, reqOptions, (res) => {
-                let data = '';
-                res.setEncoding('utf8');
-                res.on('data', (chunk) => {
-                    data += chunk;
-                });
-                res.on('end', () => {
-                    resolve({
-                        ok: res.statusCode >= 200 && res.statusCode < 300,
-                        status: res.statusCode,
-                        json: async () => JSON.parse(data),
-                        text: async () => data
+                const reqOptions = {
+                    method: options.method || 'GET',
+                    headers: headers,
+                    signal: options.signal
+                };
+
+                const req = protocol.request(url, reqOptions, (res) => {
+                    let dataArray = [];
+                    res.on('data', (chunk) => {
+                        dataArray.push(chunk);
+                    });
+                    res.on('end', () => {
+                        const buffer = Buffer.concat(dataArray);
+                        const data = buffer.toString('utf8');
+                        resolve({
+                            ok: res.statusCode >= 200 && res.statusCode < 300,
+                            status: res.statusCode,
+                            json: async () => {
+                                try {
+                                    return JSON.parse(data);
+                                } catch (e) {
+                                    throw new Error('解析响应 JSON 失败: ' + data.substring(0, 50));
+                                }
+                            },
+                            text: async () => data
+                        });
                     });
                 });
-            });
 
-            req.on('error', (err) => {
-                reject(err);
-            });
+                req.on('error', (err) => {
+                    reject(err);
+                });
 
-            if (options.body) {
-                req.write(options.body);
+                if (options.body) {
+                    req.write(options.body);
+                }
+                req.end();
+            } catch (e) {
+                reject(e);
             }
-            req.end();
         });
     }
 
@@ -182,74 +207,106 @@ class OllamaBackend {
     }
 
     /**
+     * 销毁配置界面（清理容器并解绑 API）
+     */
+    closePanel(isSilent = false) {
+        console.log('[Ollama] Closing config panel, silent:', isSilent);
+        const container = document.getElementById('ollama-config-container');
+        if (container) {
+            if (container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+            if (!isSilent) {
+                if (typeof utools !== 'undefined') {
+                    utools.setExpendHeight(0);
+                }
+            }
+        }
+        
+        delete window._ollamaAPI;
+        delete window.hideOllamaConfig;
+        
+        if (this._onPanelClose) {
+            this._onPanelClose();
+            this._onPanelClose = null;
+        }
+    }
+
+    /**
      * 挂载并打开自身的 Ollama 配置界面
-     * @param {Function} onCloseCallback 面板关闭后的回调，用于通知主程序进行 reload
+     * @param {Function} onCloseCallback 面板关闭后的回调
      */
     openConfigPanel(onCloseCallback) {
-        console.log('[Ollama] Attempting to open config panel');
-        if (typeof document === 'undefined') {
-            console.error('[Ollama] document is undefined, cannot open panel');
-            return;
-        }
+        if (typeof document === 'undefined') return;
 
-        if (typeof utools !== 'undefined') {
-            utools.setExpendHeight(600);
-        }
+        this._onPanelClose = onCloseCallback;
+        if (typeof utools !== 'undefined') utools.setExpendHeight(600);
+
+        // 注入 Bridge API 以供 iframe 调用内容（解耦持久化逻辑）
+        window._ollamaAPI = {
+            // 加载配置（此时包含模型列表等缓存）
+            loadConfig: () => {
+                const config = this.configManager.load();
+                // 也要读取全局代理状态供显示
+                const globalProxy = (typeof utools !== 'undefined' ? utools.dbStorage.getItem('app_config') : null)?.proxy || { enabled: false };
+                return { 
+                    ...config,
+                    globalProxyStatus: globalProxy.enabled,
+                    globalProxyAddr: `${globalProxy.host}:${globalProxy.port}`
+                };
+            },
+            // 保存配置
+            saveConfig: (newConfig) => {
+                this.configManager.save(newConfig);
+                this.reloadConfig();
+                return true;
+            },
+            // 测试连接与模型列表获取
+            testConnection: async (baseUrl, apiKey) => {
+                try {
+                    // Ollama 的模型列表接口是 /api/tags
+                    const endpoint = `${baseUrl}/api/tags`;
+                    const res = await this._request(endpoint, {
+                        headers: { 'Authorization': `Bearer ${apiKey}` }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const data = await res.json();
+                    return { success: true, models: (data.models || []).map(m => m.name) };
+                } catch (e) {
+                    return { success: false, error: e.message };
+                }
+            },
+            // 关闭面板
+            closePanel: () => this.closePanel(),
+            // 打开全局代理设置
+            openGlobalProxyConfig: () => {
+                const { coreService } = require('../../core/core_service');
+                const proxyService = coreService.getProxyService();
+                if (proxyService) proxyService.openPanel();
+            }
+        };
+
+        // 兼容旧逻辑钩子，确保处理正常
+        window.hideOllamaConfig = () => this.closePanel();
 
         let iframeContainer = document.getElementById('ollama-config-container');
         if (!iframeContainer) {
-            console.log('[Ollama] Creating config iframe container');
             iframeContainer = document.createElement('div');
             iframeContainer.id = 'ollama-config-container';
-            iframeContainer.style.position = 'fixed';
-            iframeContainer.style.top = '0';
-            iframeContainer.style.left = '0';
-            iframeContainer.style.width = '100vw';
-            iframeContainer.style.height = '100vh';
-            iframeContainer.style.zIndex = '999999';
-            iframeContainer.style.backgroundColor = '#f7f8f9';
+            Object.assign(iframeContainer.style, {
+                position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+                zIndex: '999999', backgroundColor: '#f7f8f9'
+            });
             
             const iframe = document.createElement('iframe');
-            
-            // 使用更健壮的路径计算
             const htmlPath = path.resolve(__dirname, 'ollama-prompt-config.html');
-            let normalizedPath = htmlPath.replace(/\\/g, '/');
-            if (!normalizedPath.startsWith('/')) normalizedPath = '/' + normalizedPath;
+            iframe.src = 'file://' + htmlPath.replace(/\\/g, '/');
+            Object.assign(iframe.style, { width: '100%', height: '100%', border: 'none', display: 'block' });
             
-            const finalUrl = 'file://' + normalizedPath;
-            console.log('[Ollama] Iframe URL:', finalUrl);
-            
-            iframe.src = finalUrl;
-            iframe.style.width = '100%';
-            iframe.style.height = '100%';
-            iframe.style.border = 'none';
-            iframe.style.display = 'block';
             iframeContainer.appendChild(iframe);
             document.body.appendChild(iframeContainer);
         }
-        
-        console.log('[Ollama] Showing container');
         iframeContainer.style.display = 'block';
-
-        // 暴露给 iframe 内部调用的关闭方法
-        window.hideOllamaConfig = function() {
-            console.log('[Ollama] Removing config container from DOM');
-            if (iframeContainer && iframeContainer.parentNode) {
-                iframeContainer.parentNode.removeChild(iframeContainer);
-            }
-            // 重置高度：在列表模式下设为 0 通常会让 uTools 恢复到自动计算的高度
-            if (typeof utools !== 'undefined') {
-                utools.setExpendHeight(0);
-            }
-            // 尝试恢复焦点（虽然 uTools 子输入框焦点通常由其自身接管，但这样更稳妥）
-            window.focus();
-
-            if (typeof onCloseCallback === 'function') {
-                onCloseCallback();
-            }
-            // 清理全局方法防止内存泄漏
-            delete window.hideOllamaConfig;
-        };
     }
 }
 

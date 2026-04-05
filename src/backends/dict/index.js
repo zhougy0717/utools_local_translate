@@ -219,8 +219,27 @@ function createDictBackend(options) {
 
   // 合并配置
   const config = Object.assign({}, sharedConfigManager.load(), options || {});
+  const closePanelFn = function(isSilent = false) {
+    const container = document.getElementById('dict-config-container');
+    if (container) {
+      container.remove();
+      if (!isSilent) {
+        if (typeof utools !== 'undefined') utools.setExpendHeight(0);
+      }
+    }
+    
+    delete window._dictAPI;
+    delete window.hideDictConfig;
+
+    if (typeof this._onPanelClose === 'function') {
+      this._onPanelClose(isSilent);
+      this._onPanelClose = null;
+    }
+  };
+
   const openConfigPanelFn = function(onCloseCallback) {
     if (typeof document === 'undefined') return;
+    this._onPanelClose = onCloseCallback;
     if (typeof utools !== 'undefined') utools.setExpendHeight(600);
 
     const { appConfig } = require('../../utils/app_config');
@@ -278,16 +297,7 @@ function createDictBackend(options) {
           return { success: false, error: err };
         }
       },
-      closePanel() {
-        const container = document.getElementById('dict-config-container');
-        if (container) container.remove();
-        delete window._dictAPI;
-        delete window.hideDictConfig;
-
-        if (typeof utools !== 'undefined') utools.setExpendHeight(0);
-        window.focus();
-        if (typeof onCloseCallback === 'function') onCloseCallback();
-      },
+      closePanel: () => closePanelFn.call(this),
       openProxyConfig() {
         const { coreService } = require('../../core/core_service');
         const proxyService = coreService.getProxyService();
@@ -341,7 +351,8 @@ function createDictBackend(options) {
       getConfigManager: function() {
         return sharedConfigManager;
       },
-      openConfigPanel: openConfigPanelFn
+      openConfigPanel: openConfigPanelFn,
+      closePanel: closePanelFn
     };
   }
 
@@ -495,7 +506,8 @@ function createDictBackend(options) {
     getConfigManager: function() {
       return sharedConfigManager;
     },
-    openConfigPanel: openConfigPanelFn
+    openConfigPanel: openConfigPanelFn,
+    closePanel: closePanelFn
   };
 }
 

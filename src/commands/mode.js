@@ -66,38 +66,56 @@ module.exports = {
 
     handleSearch(subInput, callbackSetList, appConfig) {
         const dictInfo = getDictStatus(appConfig);
+        const liveAppConfig = (typeof utools !== 'undefined' ? utools.dbStorage.getItem('app_config') : null) || appConfig;
+        const currentActive = liveAppConfig.backends || {};
 
         const items = MODES.map(mode => {
             let statusText = '';
+            let statusIcon = '⚠️';
             let currentStatus = STATUS.UNAVAILABLE;
             let extInfo = {};
+
+            // 获取各模式具体状态
             if (mode.id === 'offline_dict') {
                 currentStatus = dictInfo.status;
                 extInfo = dictInfo;
                 if (currentStatus === STATUS.READY) {
-                    statusText = '(数据已就绪)';
+                    statusText = '数据已就绪';
+                    statusIcon = '✅';
                 } else {
-                    statusText = '(未就绪，点击配置)';
+                    statusText = '未就绪，点击配置';
                 }
             } else if (mode.id === 'ollama') {
                 const ollamaInfo = getOllamaStatus(appConfig);
                 currentStatus = ollamaInfo.status;
                 extInfo = ollamaInfo;
-                if (currentStatus === STATUS.READY) statusText = '(已配置)';
-                else statusText = '(未配置 API)';
+                if (currentStatus === STATUS.READY) {
+                    statusText = '服务已联通';
+                    statusIcon = '✅';
+                } else {
+                    statusText = '未配置 API 地址或模型';
+                }
             } else if (mode.id === 'libretranslate') {
                 const libreInfo = getLibreStatus(appConfig);
                 currentStatus = libreInfo.status;
                 extInfo = libreInfo;
-                if (currentStatus === STATUS.READY) statusText = '(已配置)';
-                else statusText = '(未配置地址)';
+                if (currentStatus === STATUS.READY) {
+                    statusText = 'API 已就绪';
+                    statusIcon = '✅';
+                } else {
+                    statusText = '未配置服务地址';
+                }
             }
 
+            // 检查当前是否激活
+            const isActive = !!currentActive[mode.id];
+            const activeSuffix = isActive ? ' 🌟' : '';
+
             return {
-                title: `${mode.description} ${statusText}`,
-                description: mode.title,
+                title: `${mode.title}${activeSuffix}`,
+                description: `${statusIcon} ${statusText} — ${mode.description}`,
                 isCommandContext: true,
-                commandTrigger: 'mode', // 标记给 index.js 路由回传
+                commandTrigger: 'mode',
                 modeId: mode.id,
                 currentStatus: currentStatus,
                 extInfo: extInfo
@@ -115,6 +133,55 @@ module.exports = {
     },
 
     handleSelect(itemData, appConfig, callbackSetList) {
+        // 1. 处理 Ollama 的子命令导航逻辑 (导航组织模式，而非仅为确认)
+        if (itemData.modeId === 'ollama' && !itemData.action) {
+            const configManager = new OllamaConfig();
+            const config = configManager.load();
+            const modelName = config.model || '未选择模型';
+            const apiBase = config.apiBase || '未配置地址';
+
+            callbackSetList([
+                {
+                    title: '确认启用 Ollama 翻译模式',
+                    description: `当前模型: ${modelName}`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'ollama',
+                    action: 'confirm_ollama'
+                },
+                {
+                    title: '打开 Ollama 配置面板',
+                    description: `API: ${apiBase}`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'ollama',
+                    action: 'open_ollama_config'
+                }
+            ]);
+            return { disableClear: true };
+        }
+
+        // 2. 处理具体的子操作
+        if (itemData.action === 'confirm_ollama') {
+            appConfig.backends.offline_dict = false;
+            appConfig.backends.ollama = true;
+            appConfig.backends.libretranslate = false;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+            return { reloadBackend: true, restoreSearch: true };
+        }
+
+        if (itemData.action === 'open_ollama_config') {
+            // 关键：切换活跃标记到 Ollama，否则重载后依然是上一个后端
+            appConfig.backends.offline_dict = false;
+            appConfig.backends.ollama = true;
+            appConfig.backends.libretranslate = false;
+            if (typeof utools !== 'undefined') {
+                utools.dbStorage.setItem('app_config', appConfig);
+            }
+            return { openConfigPanel: true, reloadBackend: true };
+        }
+
+        // 3. 处理常规模式逻辑 (及原有 Fallback)
         if (itemData.action === 'open_libre_docs') {
             if (typeof utools !== 'undefined') {
                 utools.shellOpenExternal('https://docs.libretranslate.com/');
