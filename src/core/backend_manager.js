@@ -14,10 +14,13 @@ class BackendManager {
   /**
    * 初始化活跃被选中的后端
    * @param {Object} config - 包含后端的配置信息
+   * @param {boolean} skipUiCleanup - 是否跳过 UI 清理 (用于静默更新配置而不关闭当前面板)
    */
-  init(config) {
+  init(config, skipUiCleanup = false) {
     // 强制清理遗留的 UI，确保后端切换时界面不会重叠 (静默执行，不触发回调重载)
-    this.closeCurrentConfigPanel(true);
+    if (!skipUiCleanup) {
+      this.closeCurrentConfigPanel(true);
+    }
     
     this.currentConfig = config;
 
@@ -31,7 +34,8 @@ class BackendManager {
           const updatedConfig = Object.assign({}, this.currentConfig, {
             proxy: appConfig.getProxy()
           });
-          this.reload(updatedConfig);
+          // 代理变更触发的重载不应关闭当前的配置面板 (如果是从面板中发起的保存)
+          this.reload(updatedConfig, true);
         });
         this._proxyListenerAdded = true;
       }
@@ -104,10 +108,11 @@ class BackendManager {
   /**
    * 重载后端（通常在配置发生改变时被调用）
    * @param {Object} newConfig - 新的环境配置
+   * @param {boolean} skipUiCleanup - 是否跳过 UI 清理
    */
-  reload(newConfig) {
+  reload(newConfig, skipUiCleanup = false) {
     this._stopCurrentWorker();
-    this.init(newConfig);
+    this.init(newConfig, skipUiCleanup);
   }
 
   /**

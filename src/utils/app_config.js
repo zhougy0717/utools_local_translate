@@ -177,11 +177,13 @@ class AppConfig {
 
   /**
    * 获取代理设置 (格式化后的字符串，用于环境变量)
+   * @param {boolean} forceEnabled - 是否无视全局开关强制启用 (用于模块化分流控制)
    * @returns {string}
    */
-  getProxy() {
+  getProxy(forceEnabled = false) {
     const p = this.load().proxy || {};
-    if (!p.enabled || !p.host || !p.port) return '';
+    const effectiveEnabled = forceEnabled || p.enabled;
+    if (!effectiveEnabled || !p.host || !p.port) return '';
     
     let auth = '';
     if (p.authEnabled && p.username) {

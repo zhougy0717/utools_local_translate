@@ -1,7 +1,6 @@
 const _proxyAPI = window.parent._proxyAPI;
 
 const dom = {
-    enabled: document.getElementById('proxy-enabled'),
     authEnabled: document.getElementById('proxy-auth-enabled'),
     type: document.getElementById('proxy-type'),
     host: document.getElementById('proxy-host'),
@@ -11,8 +10,6 @@ const dom = {
     testUrl: document.getElementById('proxy-test-url'),
     btnTest: document.getElementById('btn-test'),
     btnSave: document.getElementById('btn-save'),
-    btnCancel: document.getElementById('btn-cancel'),
-    backToDict: document.getElementById('back-to-dict'),
     resultMessage: document.getElementById('result-message'),
     proxyFields: document.getElementById('proxy-fields'),
     authFields: document.getElementById('auth-fields')
@@ -24,7 +21,6 @@ const dom = {
 async function loadConfig() {
     try {
         const config = await _proxyAPI.getProxyConfig();
-        dom.enabled.checked = !!config.enabled;
         dom.authEnabled.checked = !!config.authEnabled;
         dom.type.value = config.type || 'http';
         dom.host.value = config.host || '';
@@ -33,7 +29,6 @@ async function loadConfig() {
         dom.password.value = config.password || '';
         dom.testUrl.value = config.testUrl || 'https://www.google.com';
         
-        toggleFields();
         toggleAuthFields();
     } catch (e) {
         showResult('读取配置失败: ' + e.message, 'error');
@@ -41,11 +36,10 @@ async function loadConfig() {
 }
 
 /**
- * 根据启用状态显示/隐藏主字段
+ * 已废弃：根据启用状态显示/隐藏主字段 (现在的原则是配置页面仅负责配置，开关由各模块自决)
  */
 function toggleFields() {
-    dom.proxyFields.style.opacity = dom.enabled.checked ? '1' : '0.5';
-    dom.proxyFields.style.pointerEvents = dom.enabled.checked ? 'auto' : 'none';
+    // 不再执行任何操作，所有字段默认可编辑
 }
 
 /**
@@ -76,7 +70,7 @@ function showResult(message, type) {
  */
 function getFormData() {
     return {
-        enabled: dom.enabled.checked,
+        enabled: true, // 始终返回 true 确保底层 getProxy() 能读取
         authEnabled: dom.authEnabled.checked,
         type: dom.type.value,
         host: dom.host.value.trim(),
@@ -88,12 +82,11 @@ function getFormData() {
 }
 
 // 绑定事件
-dom.enabled.addEventListener('change', toggleFields);
 dom.authEnabled.addEventListener('change', toggleAuthFields);
 
 dom.btnTest.addEventListener('click', async () => {
     const data = getFormData();
-    if (data.enabled && (!data.host || !data.port)) {
+    if (!data.host || !data.port) {
         showResult('请先填写代理地址和端口', 'error');
         return;
     }
@@ -120,8 +113,8 @@ dom.btnTest.addEventListener('click', async () => {
 dom.btnSave.addEventListener('click', async () => {
     const data = getFormData();
     
-    // 如果启用了代理，校验必填项
-    if (data.enabled) {
+    // 如果填写了任何一项，校验必填项
+    if (data.host || data.port) {
         if (!data.host || !data.port) {
             showResult('请完整填写代理地址和端口', 'error');
             return;
@@ -135,24 +128,17 @@ dom.btnSave.addEventListener('click', async () => {
     try {
         const { password, ...config } = data;
         await _proxyAPI.saveProxyConfig(config, password);
-        showResult('配置已成功保存', 'success');
-        
-        // 延迟关闭，让用户看到成功提示
-        setTimeout(() => {
-           _proxyAPI.closePanel();
-        }, 800);
+        showResult('配置已保存', 'success');
     } catch (e) {
         showResult('保存失败: ' + e.message, 'error');
     }
 });
 
-dom.btnCancel.addEventListener('click', () => {
-    _proxyAPI.closePanel();
-});
-
-dom.backToDict.addEventListener('click', (e) => {
-    e.preventDefault();
-    _proxyAPI.closePanel();
+// 绑定 Esc 键退出
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        _proxyAPI.closePanel();
+    }
 });
 
 // 初始化

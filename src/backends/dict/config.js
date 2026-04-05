@@ -5,7 +5,8 @@
 const { AbstractBackendConfig } = require('../base/config');
 
 const DICT_DEFAULTS = {
-  dictRepoPath: ''
+  dictRepoPath: '',
+  useProxy: false
 };
 
 class DictConfig extends AbstractBackendConfig {

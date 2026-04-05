@@ -21,14 +21,37 @@ const progressFill = document.getElementById('progressFill');
 const progressMsg = document.getElementById('progressMsg');
 const errorMessage = document.getElementById('errorMessage');
 const linkProxy = document.getElementById('linkProxy');
+const proxyToggle = document.getElementById('proxyToggle');
+const proxyStatusLabel = document.getElementById('proxyStatusLabel');
 
-// Initialize default directory
+// Initialize configuration and UI
 if (api) {
+  // 路径初始化
   const defaultDir = api.getDefaultDirectory();
   if (defaultDir) {
     pathInput.value = defaultDir;
   }
+
+  // 代理开关初始化
+  const config = api.getConfig();
+  if (config && config.useProxy !== undefined) {
+    proxyToggle.checked = config.useProxy;
+    updateProxyUI(config.useProxy);
+  }
 }
+
+function updateProxyUI(enabled) {
+    proxyStatusLabel.textContent = enabled ? 'ON' : 'OFF';
+    proxyStatusLabel.style.color = enabled ? '#166534' : '#64748b';
+}
+
+proxyToggle.onchange = () => {
+    const enabled = proxyToggle.checked;
+    updateProxyUI(enabled);
+    if (api) {
+        api.updateConfig({ useProxy: enabled });
+    }
+};
 
 function setFormDisabled(disabled) {
   btnBrowse.disabled = disabled;
@@ -132,6 +155,13 @@ btnDownload.onclick = async () => {
     progressTitle.innerText = "操作中止";
   }
 };
+
+// 绑定 Esc 键退出
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+      if (api) api.closePanel();
+  }
+});
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';

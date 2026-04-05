@@ -13,13 +13,6 @@
             全局代理设置
         </h1>
 
-        <div class="form-group">
-            <label class="checkbox-group" for="proxy-enabled">
-                <input type="checkbox" id="proxy-enabled">
-                <span>启用全局代理</span>
-            </label>
-        </div>
-
         <div id="proxy-fields">
             <div class="input-row">
                 <div class="form-group col-type">
@@ -37,6 +30,10 @@
                     <label for="proxy-port">Port</label>
                     <input type="number" id="proxy-port" placeholder="1080" min="1" max="65535">
                 </div>
+                <div class="form-group col-save">
+                    <label style="visibility: hidden;">保存</label>
+                    <button type="button" class="btn-primary" id="btn-save" title="立即保存并退出">✓</button>
+                </div>
             </div>
 
             <div class="form-group">
@@ -46,7 +43,7 @@
                 </label>
             </div>
 
-            <div id="auth-fields" style="padding-left: 20px; border-left: 2px solid #e1e4e8; margin-bottom: 20px;">
+            <div id="auth-fields" style="padding-left: 20px; border-left: 2px solid #e1e4e8; margin-bottom: 12px;">
                 <div class="form-group">
                     <label for="proxy-username">用户名</label>
                     <input type="text" id="proxy-username" placeholder="请输入用户名">
@@ -65,18 +62,12 @@
                 <div class="form-group col-test-btn">
                      <!-- 按钮放在 URL 右侧，移除 label 标签以对齐输入框 -->
                     <label style="visibility: hidden;">测试</label>
-                    <button type="button" class="btn-primary" id="btn-test">一键测试连通性</button>
+                    <button type="button" class="btn-primary" id="btn-test">测试网络连通性</button>
                 </div>
             </div>
         </div>
 
         <div id="result-message"></div>
-
-        <div class="button-group">
-            <button type="button" class="btn-cancel" id="btn-cancel" style="font-size: 0.875rem;">取消</button>
-            <button type="button" class="btn-secondary" id="btn-save" style="flex: 1.5; font-size: 0.95rem;">保存配置并退出</button>
-        </div>
-        <a href="#" id="back-to-dict" style="font-size: 0.875rem; color: #64748b; text-decoration: none; margin-top: 8px; display: block; text-align: center; flex-shrink: 0;">← 返回离线词典配置</a>
     </div>
 
     <script src="proxy-renderer.js"></script>

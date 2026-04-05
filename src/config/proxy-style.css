@@ -78,11 +78,23 @@ label {
   margin-bottom: 12px;
 }
 
-.col-type { flex: 0 0 100px; }
+.col-type { flex: 0 0 90px; }
 .col-host { flex: 1; min-width: 0; }
-.col-port { flex: 0 0 80px; }
+.col-port { flex: 0 0 75px; }
+.col-save { flex: 0 0 42px; }
 .col-test-url { flex: 1; min-width: 0; }
-.col-test-btn { flex: 0 0 auto; min-width: 120px; }
+.col-test-btn { flex: 0 0 auto; min-width: 140px; }
+
+#btn-save {
+  padding: 0;
+  width: 40px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  border-radius: var(--radius-md);
+}
 
 input, select {
   width: 100%;

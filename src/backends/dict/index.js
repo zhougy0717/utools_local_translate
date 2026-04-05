@@ -254,6 +254,12 @@ function createDictBackend(options) {
         });
         return (result && result.length > 0) ? result[0] : null;
       },
+      getConfig() {
+        return sharedConfigManager.load();
+      },
+      updateConfig(newConfig) {
+        sharedConfigManager.save(newConfig);
+      },
       getDefaultDirectory() {
         const cfg = sharedConfigManager.load();
         const appCfg = appConfig.load();
@@ -268,7 +274,9 @@ function createDictBackend(options) {
           if (typeof utools !== 'undefined') {
               utools.dbStorage.setItem('app_config', appCfg);
           }
-          const proxy = appConfig.getProxy();
+          
+          const dictCfg = sharedConfigManager.load();
+          const proxy = appConfig.getProxy(dictCfg.useProxy);
 
           const downloadOptions = {
             destDir: options.destDir,
