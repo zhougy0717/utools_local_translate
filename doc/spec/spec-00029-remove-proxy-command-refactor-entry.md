@@ -15,6 +15,17 @@
 - **位置**：表单顶部，紧随标题下方。
 - **样式**：采用 Notice 警告框样式，绿色背景，黑色文本，包含带下划线的锚点。
 
+<div style="border: 1px solid #e1e4e8; border-radius: 6px; padding: 16px; background-color: #ffffff; margin: 15px 0;">
+  <h4 style="margin-top: 0; font-size: 14px; color: #586069;">UI 效果预览</h4>
+  <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; padding: 12px; border-radius: 6px; font-size: 13px; display: flex; gap: 10px; align-items: flex-start; color: #24292e;">
+    <span style="font-size: 16px;">🌐</span>
+    <div style="flex: 1;">
+      <strong style="color: #0366d6; display: block; margin-bottom: 2px;">网络代理：</strong>
+      <span>如遇下载缓慢或失败，请尝试 <a href="#" style="color: #166534; font-weight: 600; text-decoration: underline;">配置全局代理</a>。</span>
+    </div>
+  </div>
+</div>
+
 ### 2.2 逻辑调用链路
 1. **渲染进程 (`dict-renderer.js`)**：
    - 监听 `#linkProxy` 的点击事件。
