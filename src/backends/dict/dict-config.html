@@ -247,15 +247,15 @@
   <h3>离线词典配置</h3>
   <div class="subtitle">请选择下载源和数据存储目录</div>
 
-  <div class="notice">
-    <span class="notice-icon">ℹ️</span>
+  <div id="errorMessage"></div>
+
+  <div class="notice" style="background-color: #f0fdf4; border-color: #bbf7d0;">
+    <span class="notice-icon">🌐</span>
     <div class="notice-content">
-      <strong>提示：</strong>
-      <span>下载过程中关闭插件窗口会使任务暂停，但支持断点续传。下次进入配置页点击开始即可从上次进度继续。</span>
+      <strong>网络代理：</strong>
+      <span>如遇下载缓慢或失败，请尝试 <a href="#" id="linkProxy" style="color: #166534; font-weight: 600; text-decoration: underline;">配置全局代理</a>。</span>
     </div>
   </div>
-  
-  <div id="errorMessage"></div>
 
   <div class="form-group">
     <label>下载节点</label>

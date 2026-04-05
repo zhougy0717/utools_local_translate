@@ -9,10 +9,10 @@
 | 文件 | 状态 | 说明 |
 |------|------|------|
 | `config.json` | ✅ | `plantuml_jar_path`, `java_executable`, `max_retries: 3` |
-| `scripts/linter.js` | ⚠️ | Regex Pass 框架就绪，**缺少 Jar Pass** |
-| `scripts/regex_rules.js` | ⚠️ | 仅 2 条规则（@startuml/@enduml、引号修复） |
-| `SKILL.md` | ❌ | 仅标题一行 |
-| `test.md` | ⚠️ | 3 个基本块，缺错误场景 |
+| `scripts/linter.js` | ✅ | Regex Pass + Jar Pass (带启发式修复) |
+| `scripts/regex_rules.js` | ✅ | 包含 5 条核心正则修复规则 |
+| `SKILL.md` | ✅ | 包含详细功能、**选型规范**与渲染规范 |
+| `test.md` | ✅ | 包含 9 个核心测试场景 (puml-alias, errors 等) |
 
 **核心差距**：设计文档 4.2 节 Fix-Loop 的 **步骤3（Jar Pass 循环校验 + 启发式修复）完全缺失**
 
@@ -262,11 +262,26 @@ if (hack)
 
 ---
 
+---
+
+## Phase 6: 选型规范集成与校验 (Selection Policy) — COMPLETED
+
+### 修改: `SKILL.md`
+- **新增**: `图表类型选型规范` 章节
+- **明确**: 
+    - **PlantUML**: 仅限 类图、组件图、时序图、活动图、用例图
+    - **Mermaid**: 流程图、甘特图、饼图、ER图、脑图等其他所有图表
+
+### 增强 (计划中): `scripts/linter.js`
+- 增加类型启发式识别规则。
+- 当检测到受限类型（如 `mindmap`, `gantt`）时，输出 **建议迁移至 Mermaid** 的警告。
+
+---
+
 ## 实施顺序总结
 
 ```
-Phase 1 [核心] → Phase 2 [规则] → Phase 3 [规范+容错] → Phase 4 [文档] → Phase 5 [测试]
-     ↓              ↓                ↓                   ↓              ↓
- jar_validator.js  regex_rules.js    linter.js          SKILL.md       test.md
- linter.js 改造    新增3条规则      错误处理增强        重写           扩展9个场景
+Ph 1 [核心] → Ph 2 [规则] → Ph 3 [规范] → Ph 4 [文档] → Ph 5 [测试] → Ph 6 [选型规范]
+     ↓            ↓             ↓            ↓            ↓             ↓
+ jar_validator.js regex_rules.js linter.js    SKILL.md     test.md       SKILL.md 更新
 ```

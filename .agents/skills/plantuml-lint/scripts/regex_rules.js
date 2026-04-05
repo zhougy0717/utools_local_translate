@@ -35,7 +35,7 @@ const regexRules = [
             fixed = fixed.replace(/\u21d2/g, '=>');         // ⇒ (U+21D2 right double arrow)
             fixed = fixed.replace(/\u2799/g, '--->');      // ➙ (U+2799 heavy long right arrow)
             // Fix common typo: missing > on arrows
-            fixed = fixed.replace(/\b(\w+)\s*-\s*(?=\s*\w)/g, '$1 -> ');
+            // fixed = fixed.replace(/\b(\w+)\s*-\s*(?=\s*\w)/g, '$1 -> '); // This rule is too aggressive and breaks file names
             return fixed;
         }
     },

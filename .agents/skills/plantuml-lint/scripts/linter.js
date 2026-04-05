@@ -60,6 +60,30 @@ function applyRegexFixes(content) {
 }
 
 /**
+ * Check if the diagram type adheres to the selection policy.
+ * Only allows: Class, Component, Sequence, Activity, Use Case.
+ */
+function checkDiagramSelection(content) {
+    const restrictedTypes = [
+        { name: 'Mindmap', regex: /(@startmindmap|mindmap)/i },
+        { name: 'WBS', regex: /(@startwbs|wbs)/i },
+        { name: 'Gantt Chart', regex: /(@startgantt|gantt)/i },
+        { name: 'Salt (UI)', regex: /(@startsalt|salt)/i },
+        { name: 'JSON/YAML', regex: /(@start(json|yaml)|json|yaml)/i },
+        { name: 'EBNF', regex: /(@startebnf|ebnf)/i },
+        { name: 'Ditaa/Dot', regex: /(@start(ditaa|dot)|ditaa|dot)/i }
+    ];
+
+    for (const type of restrictedTypes) {
+        if (type.regex.test(content)) {
+            console.warn(`  [Policy] Warning: "${type.name}" detected. Please consider using Mermaid for this type of diagram as per project policy.`);
+            return false;
+        }
+    }
+    return true;
+}
+
+/**
  * Normalize a PlantUML block to the standard Markdown fence format:
  * ```plantuml
  * @startuml
@@ -109,6 +133,9 @@ function processMarkdown(markdown, config) {
 
         // Step 1: Regex Pass (fast fixes)
         let fixed = applyRegexFixes(rawContent);
+
+        // Step 1.5: Selection Policy Check
+        checkDiagramSelection(fixed);
 
         // Step 2: Jar Pass (authoritative syntax check via plantuml.jar)
         let jarResult = null;

@@ -248,7 +248,7 @@ function createDictBackend(options) {
           if (typeof utools !== 'undefined') {
               utools.dbStorage.setItem('app_config', appCfg);
           }
-          const proxy = appCfg.proxy;
+          const proxy = appConfig.getProxy();
 
           const downloadOptions = {
             destDir: options.destDir,
@@ -287,6 +287,11 @@ function createDictBackend(options) {
         if (typeof utools !== 'undefined') utools.setExpendHeight(0);
         window.focus();
         if (typeof onCloseCallback === 'function') onCloseCallback();
+      },
+      openProxyConfig() {
+        if (typeof window.openProxyConfigPanel === 'function') {
+            window.openProxyConfigPanel();
+        }
       }
     };
 

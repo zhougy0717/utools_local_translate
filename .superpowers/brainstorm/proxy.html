@@ -1,0 +1,100 @@
+<div class="mockup">
+  <div class="mockup-header">全局代理设置 (Global Proxy Settings)</div>
+  <div class="mockup-body">
+    <div class="section">
+      <h3>1. 代理状态与类型</h3>
+      <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; gap: 8px;">
+          <input type="checkbox" checked id="proxy-enabled"> 启用代理
+        </label>
+        <div style="display: flex; gap: 12px; align-items: center;">
+          <span class="label">类型:</span>
+          <select class="mock-input" style="width: auto;">
+            <option>HTTP</option>
+            <option>SOCKS5</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <h3>2. 服务器地址</h3>
+      <div style="display: flex; gap: 12px; align-items: center;">
+        <input class="mock-input" style="flex-grow: 1" placeholder="例如: 127.0.0.1:7890" value="127.0.0.1:7890">
+      </div>
+      <p class="subtitle">请输入包含主机名和端口号的完整地址。</p>
+    </div>
+
+    <div class="section">
+      <h3>3. 身份验证 (可选)</h3>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div>
+          <span class="label">用户名</span>
+          <input class="mock-input" type="text" placeholder="Username">
+        </div>
+        <div>
+          <span class="label">密码</span>
+          <input class="mock-input" type="password" placeholder="Password">
+        </div>
+      </div>
+    </div>
+
+    <hr style="border: 0; border-top: 1px solid #eee; margin: 24px 0;">
+
+    <div style="display: flex; gap: 16px;">
+      <button class="mock-button" style="background: #f3f4f6; color: #374151;">一键测试连接</button>
+      <div style="display: flex; align-items: center; color: #10b981; font-size: 14px;">
+        <!-- 显示测试结果，例如: ✅ 连接成功 -->
+      </div>
+      <div style="flex-grow: 1"></div>
+      <button class="mock-button" style="background: #2563eb; color: white;">保存配置</button>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 40px;">
+  <h2>集成架构方案</h2>
+  <div class="options">
+    <div class="option" data-choice="dedicated" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>1. 独立代理配置页 (Dedicated Page)</h3>
+        <p>创建 <code>src/config/proxy.html</code>。所有网络配置页面通过 iframe 跳转到此 URL。</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <ul>
+              <li>极简且专注：只有一个目的，即设置网络代理。</li>
+              <li>更快速的加载：仅包含代理相关的逻辑和资源。</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <ul>
+              <li>导航较繁琐：用户从多个配置入口点进来，可能难以“回退”到之前的状态。</li>
+              <li>维护分散：如果有多类全局配置，则会有很多个 HTML 文件。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="option" data-choice="integrated" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>2. 综合设置中心 (Config Hub)</h3>
+        <p>创建 <code>src/config/index.html</code> 包含多个标签 (Proxy, Backend, UI)。其它页面跳转时直接链接到 <code>#proxy</code> 锚点。</p>
+        <div class="pros-cons">
+          <div class="pros">
+            <ul>
+              <li>标准化管理：所有全局配置（显示耗时、默认语言等）都可以集中在一处。</li>
+              <li>更一致的交互体验：更符合大型 uTools 插件的设计惯例。</li>
+            </ul>
+          </div>
+          <div class="cons">
+            <ul>
+              <li>初次开发成本略高：需要实现基本的 Tab 切换或路由。</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

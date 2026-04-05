@@ -20,6 +20,7 @@ const progressStats = document.getElementById('progressStats');
 const progressFill = document.getElementById('progressFill');
 const progressMsg = document.getElementById('progressMsg');
 const errorMessage = document.getElementById('errorMessage');
+const linkProxy = document.getElementById('linkProxy');
 
 // Initialize default directory
 if (api) {
@@ -48,6 +49,15 @@ btnBrowse.onclick = () => {
     errorMessage.style.display = 'none';
   }
 };
+
+if (linkProxy) {
+  linkProxy.onclick = (e) => {
+    e.preventDefault();
+    if (api && typeof api.openProxyConfig === 'function') {
+      api.openProxyConfig();
+    }
+  };
+}
 
 btnCancel.onclick = () => {
   if (api) api.closePanel();

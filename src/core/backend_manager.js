@@ -2,6 +2,8 @@ const { createDictBackend } = require('../backends/dict/index.js');
 const { createOllamaBackend } = require('../backends/ollama/index.js');
 const { createLibreTranslateBackend } = require('../backends/libretranslate/index.js');
 
+const { appConfig } = require('../utils/app_config');
+
 class BackendManager {
   constructor() {
     this.activeBackend = null;
@@ -10,31 +12,32 @@ class BackendManager {
 
   /**
    * 初始化活跃被选中的后端
-   * @param {Object} appConfig - 包含后端的配置信息
+   * @param {Object} config - 包含后端的配置信息
    */
-  init(appConfig) {
-    this.currentConfig = appConfig;
+  init(config) {
+    this.currentConfig = config;
 
     // 应用代理设置
-    if (appConfig.proxy) {
-      console.log(`[BackendManager] Applying proxy: ${appConfig.proxy}`);
-      process.env.HTTP_PROXY = appConfig.proxy;
-      process.env.HTTPS_PROXY = appConfig.proxy;
+    const proxyStr = appConfig.getProxy();
+    if (proxyStr) {
+      console.log(`[BackendManager] Applying proxy: ${proxyStr}`);
+      process.env.HTTP_PROXY = proxyStr;
+      process.env.HTTPS_PROXY = proxyStr;
     } else {
       delete process.env.HTTP_PROXY;
       delete process.env.HTTPS_PROXY;
     }
 
-    if (!appConfig.backends) {
-       appConfig.backends = { offline_dict: true }; // 降级处理
+    if (!config.backends) {
+       config.backends = { offline_dict: true }; // 降级处理
     }
     
-    if (appConfig.backends.libretranslate) {
-      this.activeBackend = createLibreTranslateBackend(appConfig.libretranslate);
-    } else if (appConfig.backends.ollama) {
-      this.activeBackend = createOllamaBackend(appConfig.ollama);
+    if (config.backends.libretranslate) {
+      this.activeBackend = createLibreTranslateBackend(config.libretranslate);
+    } else if (config.backends.ollama) {
+      this.activeBackend = createOllamaBackend(config.ollama);
     } else {
-      this.activeBackend = createDictBackend({ dictRepoPath: appConfig.resourcePath });
+      this.activeBackend = createDictBackend({ dictRepoPath: config.resourcePath });
     }
   }
 

@@ -38,9 +38,26 @@ description: 自动修复 Markdown 文件中内嵌 PlantUML 代码块的语法�
 ```
 ````
 
+## 图表类型选型规范 (Diagram Selection Policy)
+
+为了保持文档的专业性与可维护性，必须严格遵守以下图表引擎选型规定：
+
+1. **PlantUML 专用领域**：仅限输出以下标准 UML 图表：
+   - **类图 (Class Diagram)**
+   - **组件图 (Component Diagram)**
+   - **时序图 (Sequence Diagram)**
+   - **活动图 (Activity Diagram)**
+   - **用例图 (Use Case Diagram)**
+2. **Mermaid 专用领域**：其他所有非标准 UML 示意图应优先使用 Mermaid 输出，包括但不限于：
+   - 流程图 (Flowchart - 非 UML 活动图)
+   - 甘特图 (Gantt Chart)
+   - 饼图 (Pie Chart)
+   - 实体关系图 (ER Diagram)
+   - 思维导图 (Mindmap) 等。
+
 ## 架构设计与渲染规范 (Design Guidelines)
 
-在生成和修改 PlantUML 图表时，除了基础语法正确，还必须遵循以下标准 UML 约束与最佳实践（特别是组件图和类图）：
+在生成和修改 PlantUML 图表时，除了必须符合上述“选型规范”，还需遵循以下标准 UML 约束与最佳实践：
 
 1. **接口方块化渲染**：
    - 默认情况下 PlantUML 会将 `interface` 渲染为“棒棒糖(lollipop)”样式。

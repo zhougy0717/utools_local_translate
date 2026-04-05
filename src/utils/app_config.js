@@ -6,7 +6,15 @@
 const { storageAdapter } = require('./storage_adapter');
 
 const APP_CONFIG_DEFAULTS = {
-  proxy: '',
+  proxy: {
+    enabled: false,
+    authEnabled: false,
+    type: 'http',
+    host: '',
+    port: '',
+    username: '',
+    testUrl: 'https://www.google.com'
+  },
   activeBackend: 'offline_dict',
   showTranslationCost: true,
   backends: {
@@ -34,11 +42,61 @@ class AppConfig {
 
     const stored = storageAdapter.getItem(this.storageKey);
     if (stored) {
-      this._cache = this._mergeDefaults(stored);
+      // 执行向后兼容迁移
+      const migrated = this._migrateProxy(stored);
+      this._cache = this._mergeDefaults(migrated);
     } else {
-      this._cache = Object.assign({}, this.defaults);
+      this._cache = JSON.parse(JSON.stringify(this.defaults));
     }
     return this._cache;
+  }
+
+  /**
+   * 向后兼容：将字符串形式的 proxy 迁移为对象
+   * @param {Object} stored 
+   * @returns {Object}
+   */
+  _migrateProxy(stored) {
+    if (typeof stored.proxy === 'string' && stored.proxy.trim() !== '') {
+      console.log('[AppConfig] Migrating legacy proxy string to object:', stored.proxy);
+      try {
+        const proxyStr = stored.proxy.trim();
+        let host = proxyStr;
+        let port = '';
+        
+        // 简单处理 http:// 或 https:// 前缀
+        let cleanProxy = proxyStr.replace(/^https?:\/\//, '');
+        if (cleanProxy.includes(':')) {
+          const parts = cleanProxy.split(':');
+          host = parts[0];
+          port = parts[1];
+        }
+
+        stored.proxy = {
+          enabled: true,
+          authEnabled: false,
+          type: 'http',
+          host: host,
+          port: port,
+          username: '',
+          testUrl: 'https://www.google.com'
+        };
+      } catch (e) {
+        console.error('[AppConfig] Proxy migration failed:', e);
+        stored.proxy = JSON.parse(JSON.stringify(this.defaults.proxy));
+      }
+    } else if (!stored.proxy || typeof stored.proxy !== 'object') {
+      stored.proxy = JSON.parse(JSON.stringify(this.defaults.proxy));
+    }
+
+    // 结构化升级：确保存在 authEnabled，且如果已有用户名则默认开启
+    if (stored.proxy && typeof stored.proxy === 'object') {
+      if (stored.proxy.authEnabled === undefined) {
+        stored.proxy.authEnabled = !!(stored.proxy.username && stored.proxy.username.trim() !== '');
+      }
+    }
+
+    return stored;
   }
 
   /**
@@ -49,14 +107,19 @@ class AppConfig {
   _mergeDefaults(stored) {
     const result = Object.assign({}, this.defaults);
     
-    // 合并 backends 对象
+    // 合并 backends 
     if (stored.backends) {
       result.backends = Object.assign({}, this.defaults.backends, stored.backends);
+    }
+
+    // 合并 proxy (深度合并一级)
+    if (stored.proxy) {
+      result.proxy = Object.assign({}, this.defaults.proxy, stored.proxy);
     }
     
     // 合并其他顶层属性
     Object.keys(stored).forEach(key => {
-      if (key !== 'backends') {
+      if (key !== 'backends' && key !== 'proxy') {
         result[key] = stored[key];
       }
     });
@@ -113,11 +176,44 @@ class AppConfig {
   }
 
   /**
-   * 获取代理设置
+   * 获取代理设置 (格式化后的字符串，用于环境变量)
    * @returns {string}
    */
   getProxy() {
-    return this.load().proxy || '';
+    const p = this.load().proxy || {};
+    if (!p.enabled || !p.host || !p.port) return '';
+    
+    let auth = '';
+    if (p.authEnabled && p.username) {
+      const password = this.getProxyPassword();
+      auth = password ? `${p.username}:${password}@` : `${p.username}@`;
+    }
+    
+    const type = p.type === 'socks5' ? 'socks5' : 'http';
+    return `${type}://${auth}${p.host}:${p.port}`;
+  }
+
+  /**
+   * 从 dbCryptoStorage 获取代理密码
+   * @returns {string} 
+   */
+  getProxyPassword() {
+    if (typeof utools === 'undefined' || !utools.dbCryptoStorage) return '';
+    return utools.dbCryptoStorage.getItem('proxy_password') || '';
+  }
+
+  /**
+   * 保存代理设置和加密密码
+   * @param {Object} proxyConfig 
+   * @param {string} password 
+   */
+  saveProxyConfig(proxyConfig, password) {
+    this.save({ proxy: proxyConfig });
+    if (typeof utools !== 'undefined' && utools.dbCryptoStorage) {
+      if (password !== undefined) {
+          utools.dbCryptoStorage.setItem('proxy_password', password);
+      }
+    }
   }
 
   /**
