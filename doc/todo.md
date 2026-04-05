@@ -2,6 +2,7 @@
 - [X] 对数据库进行压缩，并在首次加载时解压
 
 - [x] slash command
+  - [x] 清理冗余的 /ollama 和 /path 命令，完全由 UI 接管
 
 # 模型翻译
 - [x] 支持ollama API

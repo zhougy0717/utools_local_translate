@@ -20,10 +20,7 @@ const initialConfig = appConfig.load();
 const backendConfig = {
   resourcePath: initialConfig.resourcePath || '',
   proxy: appConfig.getProxy(),
-  backends: initialConfig.backends,
-  // 为兼容旧版 BackendManager，传递各 backend 配置
-  ollama: {},
-  libretranslate: {}
+  backends: initialConfig.backends
 };
 
 BackendManager.init(backendConfig);
@@ -151,9 +148,7 @@ if (typeof window !== 'undefined') {
                     const backendConfig = {
                         resourcePath: newConfig.resourcePath || '',
                         proxy: appConfig.getProxy(),
-                        backends: newConfig.backends,
-                        ollama: {},
-                        libretranslate: {}
+                        backends: newConfig.backends
                     };
                     BackendManager.reload(backendConfig);
                 }
@@ -166,9 +161,7 @@ if (typeof window !== 'undefined') {
                         const backendConfig = {
                           resourcePath: newConfig.resourcePath || '',
                           proxy: appConfig.getProxy(),
-                          backends: newConfig.backends,
-                          ollama: {},
-                          libretranslate: {}
+                          backends: newConfig.backends
                         };
                         BackendManager.reload(backendConfig);
 
@@ -195,9 +188,7 @@ if (typeof window !== 'undefined') {
                   const backendConfig = {
                     resourcePath: newConfig.resourcePath || '',
                     proxy: appConfig.getProxy(),
-                    backends: newConfig.backends,
-                    ollama: {},
-                    libretranslate: {}
+                    backends: newConfig.backends
                   };
                   BackendManager.reload(backendConfig);
                 }
