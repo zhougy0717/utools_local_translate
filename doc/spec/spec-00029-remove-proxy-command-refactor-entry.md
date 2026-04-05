@@ -127,3 +127,36 @@ Proxy --> User : 返回词典配置页
 - [ ] 验证点击词典下载页的代理链接，是否能正确触发 `ProxyService.openPanel()` 并显示界面。
 - [ ] 验证代理面板关闭后，控制台是否能看到 `BackendManager` 触发的自动重载日志。
 - [ ] 验证输入 `/` 后，建议列表中不再出现 `代理设置` 项。
+
+## 4. 测试设计 (Test Design)
+
+### 4.1 单元测试设计 (Unit Testing)
+重构引入了事件驱动模式，重点关注核心组件的订阅与响应：
+- **ProxyService 广播校验**：验证调用 `saveProxyConfig()` 或 `closePanel()` 时是否正确发出 `PROX_CONFIG_CHANGED` 事件。
+- **BackendManager 自动重载**：模拟广播事件，验证 `BackendManager` 是否如预期地执行了 `reload()` 重新配置后端环境。
+- **DictBackend 实例动态更新**：验证其内部 `DictDownloader` 是否成功接收广播并即时更新了其底层的代理 Proxy Agent，不中断正在查词或下载的句柄。
+
+### 4.2 集成与回归测试 (Regression Testing)
+- **UI 挂载与卸载**：验证 `ProxyService` 指送的 Iframe 挂载是否正常，样式是否符合 spec 预览，卸载后 DOM 节点是否被彻底移除。
+- **配置一致性**：确认通过词库页修改的代理配置，在持久化存储中与 `/mode` 切换后的其他后端共享且有效。
+
+## 6. preload.js 专项改造设计
+为确保 `preload.js` 仅保留引导程序职责，以下列出该文件的改造清单：
+
+### 6.1 当前现状 (Before)
+- **UI 直接定义**：在顶层定义了 `window.openProxyConfigPanel` 和 `window._closeProxyConfigPanel`，包含具体的 DOM 创建和样式设置逻辑。
+- **业务耦合**：在 `openProxyConfigPanel` 的回调中显式调用 `BackendManager.reload(backendConfig)`。
+- **命令响应驱动**：在 `uTools.select` 周期内，专门处理 `itemData.isCommandContext` 中的 `openProxyConfigPanel` 信号。
+
+### 6.2 确定删除项 (To De-Logic)
+- **[Delete]** `window.openProxyConfigPanel`: 移除整段 DOM 挂载逻辑，该职责转移至 `ProxyService`。
+- **[Delete]** `onCloseCallback` 生命周期传递：不再由 `preload.js` 在面板关闭时通知后端。
+- **[Delete]** `select` 中的信号监听：移除 `if (signal.openProxyConfigPanel)` 逻辑块。因为 `/proxy` 命令已移除，此处的死代码将被清理。
+- **[Delete]** 冗余清理逻辑：移除 `/mode` 切换时对 `window.hideProxyConfig` 的多余检查（交由 `ProxyService` 自行管理）。
+
+### 6.3 最终保留职责 (After)
+- **服务引导**：仅保留 `BackendManager.init()` 和 `coreService.init()` 的启动调用。
+- **IPC 映射**：保留 uTools 规定的 `dict` 结构，负责将用户输入转发至 `CommandManager` 或 `BackendManager`。
+
+## 7. 后续规划
+- 在后续迭代中，计划为 **Ollama** 和 **LibreTranslate** 的配置界面添加类似的代理入口链接，确保各个后端都能方便地进行网络调试。
