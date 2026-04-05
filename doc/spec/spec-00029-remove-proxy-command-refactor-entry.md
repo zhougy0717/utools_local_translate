@@ -30,34 +30,34 @@
 在重构后，系统由“命令式驱动”转变为“事件驱动”，以解除渲染进程与主逻辑之间的直接耦合。
 
 #### 类图 (Architecture)
-```mermaid
-classDiagram
-    class EventEmitter {
-        <<interface>>
-        +on(event, listener)
-        +emit(event, ...args)
-    }
-    
-    class ProxyService {
-        +saveProxyConfig()
-        +closePanel()
-    }
-    
-    class BackendManager {
-        +init()
-        +reload()
-        -onProxyChanged()
-    }
-    
-    class DictBackend {
-        +queryWord()
-        -proxyConfig
-    }
-    
-    EventEmitter <|-- ProxyService : 继承/组合广播能力
-    ProxyService <.. BackendManager : 监听代理变更事件
-    ProxyService <.. DictBackend : 订阅配置以获取最新通知
-    BackendManager o-- DictBackend : 管理生命周期
+```plantuml
+@startuml
+interface EventEmitter {
+  +on(event, listener)
+  +emit(event, ...args)
+}
+
+class ProxyService {
+  +saveProxyConfig()
+  +closePanel()
+}
+
+class BackendManager {
+  +init(config)
+  +reload(newConfig)
+  -onProxyChanged()
+}
+
+class DictBackend {
+  +queryWord(word, sourceLang, targetLang, callback, progressCallback)
+  -proxyConfig
+}
+
+EventEmitter <|-- ProxyService : 继承/组合广播能力
+ProxyService <.. BackendManager : 监听代理变更事件
+ProxyService <.. DictBackend : 订阅配置以获取最新通知
+BackendManager "1" o-- "*" DictBackend : 管理生命周期
+@enduml
 ```
 
 #### 架构变更点：
