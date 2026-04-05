@@ -112,6 +112,12 @@ Proxy --> User : 返回词典配置页
 5. **系统重载**：`BackendManager` 监听到事件 -> 自动执行 `this.reload()` 刷新整个后端的代理环境。
 6. **面板关闭**：调用 `proxyService.closePanel()` -> 清理 DOM，不涉及业务回调。
 
+### 2.5 即时生效保障 (Hot-Reloading)
+为确保用户在配置代理后能立即提升下载成功率，无需重启插件或重开下载面板：
+1. **实例级监听**：`DictBackend` 实例在创建后会订阅 `ProxyService` 指送的 `PROX_CONFIG_CHANGED` 事件。
+2. **状态同步**：收到事件后，`DictBackend` 将从 `appConfig` 获取最新代理，并调用其内部 `DictDownloader` 的配置更新接口。
+3. **即时重用**：在下载过程中切换代理，后续的文件分卷请求将即刻使用新的 Proxy Agent，确保已失败的连接在重试时能享受新的网络通路。
+
 ## 3. 命令卸载
 - **清理引用**：从 `src/commands/index.js` 移除 `proxyCommand` 注册。
 - **物理删除**：逻辑迁移完成后，彻底删除 `src/commands/proxy.js`。
