@@ -59,9 +59,11 @@ function getLibreStatus(appConfig) {
 }
 
 
+const Icons = require('./icons.js');
+
 module.exports = {
     trigger: 'mode',
-    title: '选择模式',
+    title: '选择翻译模式',
     description: '切换翻译使用的模型或离线词典 (/mode)',
 
     handleSearch(subInput, callbackSetList, appConfig) {
@@ -71,9 +73,10 @@ module.exports = {
 
         const items = MODES.map(mode => {
             let statusText = '';
-            let statusIcon = '⚠️';
+            let statusPrefix = '⚠️';
             let currentStatus = STATUS.UNAVAILABLE;
             let extInfo = {};
+            let icon = Icons.DICT;
 
             // 获取各模式具体状态
             if (mode.id === 'offline_dict') {
@@ -81,44 +84,48 @@ module.exports = {
                 extInfo = dictInfo;
                 if (currentStatus === STATUS.READY) {
                     statusText = '数据已就绪';
-                    statusIcon = '✅';
+                    statusPrefix = '✅';
                 } else {
                     statusText = '未就绪，点击配置';
                 }
+                icon = Icons.DICT;
             } else if (mode.id === 'ollama') {
                 const ollamaInfo = getOllamaStatus(appConfig);
                 currentStatus = ollamaInfo.status;
                 extInfo = ollamaInfo;
                 if (currentStatus === STATUS.READY) {
                     statusText = '服务已联通';
-                    statusIcon = '✅';
+                    statusPrefix = '✅';
                 } else {
                     statusText = '未配置 API 地址或模型';
                 }
+                icon = Icons.OLLAMA;
             } else if (mode.id === 'libretranslate') {
                 const libreInfo = getLibreStatus(appConfig);
                 currentStatus = libreInfo.status;
                 extInfo = libreInfo;
                 if (currentStatus === STATUS.READY) {
                     statusText = 'API 已就绪';
-                    statusIcon = '✅';
+                    statusPrefix = '✅';
                 } else {
                     statusText = '未配置服务地址';
                 }
+                icon = Icons.LIBRE;
             }
 
             // 检查当前是否激活
             const isActive = !!currentActive[mode.id];
-            const activeSuffix = isActive ? ' 🌟' : '';
+            const activeSuffix = isActive ? ' (已激活 🌟)' : '';
 
             return {
                 title: `${mode.title}${activeSuffix}`,
-                description: `${statusIcon} ${statusText} — ${mode.description}`,
+                description: `${statusPrefix} ${statusText} — ${mode.description}`,
                 isCommandContext: true,
                 commandTrigger: 'mode',
                 modeId: mode.id,
                 currentStatus: currentStatus,
-                extInfo: extInfo
+                extInfo: extInfo,
+                icon: icon
             };
         });
 
@@ -218,10 +225,10 @@ module.exports = {
             if (itemData.modeId === 'offline_dict' || itemData.modeId === 'ollama') {
                 // 这两者支持内置配置面板
                 return { openConfigPanel: true, reloadBackend: true };
-            } else if (itemData.id === 'libretranslate') {
+            } else if (itemData.modeId === 'libretranslate') {
                 // LibreTranslate 目前仅提示指令
                 callbackSetList([
-                    { title: 'LibreTranslate 未配置', description: '请输入 /libre 命令进行配置' }
+                    { title: '配置 LibreTranslate', description: '设置服务器地址与 API Key (/libre <url> [key])' }
                 ]);
                 return { disableClear: true };
             }

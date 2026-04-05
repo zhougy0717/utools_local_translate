@@ -7,6 +7,18 @@ const COMMANDS = [
     libreCommand
 ];
 
+const Icons = require('./icons.js');
+
+function toBoldUnicode(str) {
+    return str.split('').map(char => {
+        const code = char.charCodeAt(0);
+        if (code >= 65 && code <= 90) return String.fromCodePoint(0x1D400 + code - 65); // A-Z
+        if (code >= 97 && code <= 122) return String.fromCodePoint(0x1D41A + code - 97); // a-z
+        if (code >= 48 && code <= 57) return String.fromCodePoint(0x1D7CE + code - 48); // 0-9
+        return char;
+    }).join('');
+}
+
 const CommandManager = {
     handleSearch(searchWord, callbackSetList, appConfig) {
         const parts = searchWord.split(/\s+/);
@@ -26,17 +38,25 @@ const CommandManager = {
         const matchedCommands = COMMANDS.filter(cmd => cmd.trigger.startsWith(inputCmd));
 
         if (matchedCommands.length > 0) {
-            const listItems = matchedCommands.map(cmd => ({
-                title: cmd.description,
-                description: cmd.title,
-                isCommandContext: true,
-                trigger: cmd.trigger,
-                isRootCommand: true
-            }));
+            const listItems = matchedCommands.map(cmd => {
+                let icon = Icons.MODE;
+                if (cmd.trigger === 'libre') icon = Icons.LIBRE;
+                
+                const boldTrigger = toBoldUnicode(`/${cmd.trigger}`);
+                
+                return {
+                    title: `[${boldTrigger}]  ${cmd.title}`,
+                    description: cmd.description.replace(/\s*\(\/.*\)$/, ''),
+                    isCommandContext: true,
+                    trigger: cmd.trigger,
+                    isRootCommand: true,
+                    icon: icon
+                };
+            });
             callbackSetList(listItems);
         } else {
             callbackSetList([
-                { title: '未找到匹配的命令', description: searchWord }
+                { title: '未找到匹配的命令', description: searchWord, icon: Icons.WARNING }
             ]);
         }
     },

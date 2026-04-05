@@ -16,8 +16,8 @@ class BackendManager {
    * @param {Object} config - 包含后端的配置信息
    */
   init(config) {
-    // 强制清理遗留的 UI，确保后端切换时界面不会重叠
-    this.closeCurrentConfigPanel();
+    // 强制清理遗留的 UI，确保后端切换时界面不会重叠 (静默执行，不触发回调重载)
+    this.closeCurrentConfigPanel(true);
     
     this.currentConfig = config;
 

@@ -232,8 +232,9 @@ function createDictBackend(options) {
     delete window.hideDictConfig;
 
     if (typeof this._onPanelClose === 'function') {
-      this._onPanelClose(isSilent);
+      const callback = this._onPanelClose;
       this._onPanelClose = null;
+      if (!isSilent) callback();
     }
   };
 

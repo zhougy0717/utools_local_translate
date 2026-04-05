@@ -226,9 +226,10 @@ class OllamaBackend {
         delete window._ollamaAPI;
         delete window.hideOllamaConfig;
         
-        if (this._onPanelClose) {
-            this._onPanelClose();
+        if (typeof this._onPanelClose === 'function') {
+            const callback = this._onPanelClose;
             this._onPanelClose = null;
+            if (!isSilent) callback();
         }
     }
 

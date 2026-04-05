@@ -2,11 +2,12 @@ const UtoolsHelper = require('../utils/utools_helper');
 const { LibreTranslateConfig } = require('../backends/libretranslate/config');
 const http = require('http');
 const https = require('https');
+const Icons = require('./icons.js');
 
 module.exports = {
     trigger: 'libre',
     title: '配置 LibreTranslate',
-    description: '设置 LibreTranslate 服务器地址和 API Key (/libre <url> [key])',
+    description: '设置服务器地址与 API Key (/libre <url> [key])',
 
     handleSearch(subInput, callbackSetList, appConfig) {
         const input = subInput.trim();
@@ -17,10 +18,11 @@ module.exports = {
         const items = [
             {
                 title: '访问 LibreTranslate 官网文档',
-                description: '查看如何使用 pip 或 Docker 部署本地翻译服务器 (https://docs.libretranslate.com/)',
+                description: '查看如何使用 pip 或 Docker 部署本地翻译服务器',
                 isCommandContext: true,
                 commandTrigger: 'libre',
-                action: 'open_docs'
+                action: 'open_docs',
+                icon: Icons.LIBRE
             }
         ];
 
@@ -36,7 +38,8 @@ module.exports = {
                 commandTrigger: 'libre',
                 action: 'save_and_test', // 允许再次点击并保存/激活
                 apiBase: currentApiBase,
-                apiKey: currentApiKey
+                apiKey: currentApiKey,
+                icon: Icons.LIBRE
             };
             items.unshift(currentItem);
             
@@ -67,7 +70,11 @@ module.exports = {
                 // 创建新对象触发渲染
                 const updatedItems = items.map(it => {
                     if (it === currentItem) {
-                        return { ...it, description: res.ok ? '🟢 服务器连接正常' : `❌ 服务器响应异常 (状态码: ${res.status})` };
+                        return { 
+                            ...it, 
+                            description: res.ok ? '🟢 服务器连接正常' : `❌ 服务器响应异常 (状态码: ${res.status})`,
+                            icon: res.ok ? Icons.READY : Icons.WARNING
+                        };
                     }
                     return it;
                 });
@@ -78,7 +85,11 @@ module.exports = {
                 const isTimeout = err.name === 'AbortError';
                 const updatedItems = items.map(it => {
                     if (it === currentItem) {
-                        return { ...it, description: isTimeout ? '❌ 连接超时 (2s)' : `❌ 无法连接到服务器: ${err.message}` };
+                        return { 
+                            ...it, 
+                            description: isTimeout ? '❌ 连接超时 (2s)' : `❌ 无法连接到服务器: ${err.message}`,
+                            icon: Icons.WARNING
+                        };
                     }
                     return it;
                 });
@@ -95,15 +106,17 @@ module.exports = {
                 commandTrigger: 'libre',
                 action: 'save_and_test',
                 apiBase: inputApiBase,
-                apiKey: inputApiKey
+                apiKey: inputApiKey,
+                icon: Icons.LIBRE
             });
         } else {
             items.unshift({
-                title: '请输入 LibreTranslate 服务器地址',
+                title: '请输入 LibreTranslate 地址',
                 description: '例如: http://127.0.0.1:5000',
                 isCommandContext: true,
                 commandTrigger: 'libre',
-                action: 'none'
+                action: 'none',
+                icon: Icons.LIBRE
             });
         }
 

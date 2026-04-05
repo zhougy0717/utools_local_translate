@@ -1,0 +1,24 @@
+/**
+ * 为斜线命令提供统一的视觉图标集 (Base64 SVG)
+ * 设计原则：极简、高对比度、支持亮/暗色模式
+ * 当前颜色：使用深灰色 (#444) 确保在浅色背景下可见
+ */
+module.exports = {
+    // 切换模式图标 (🔄 / Layers) - 使用深灰色
+    MODE: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTcgMTEuNUwzIDE1bDQgMy41Ii8+PHBhdGggZD0iTTIxIDEycS00LjUgMC03LjUgMy41Ii8+PHBhdGggZD0iTTE3IDEyLjVMMjEgOWwtNC0zLjUiLz48cGF0aCBkPSJNMyAxMnE0LjUgMCA3LjUtMy41Ii8+PC9zdmc+',
+    
+    // 网络/LibreTranslate 图标 (🌐 / World) - 使用深灰色
+    LIBRE: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNDQ0NDQ0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iMTAiLz48bGluZSB4MT0iMiIgeTE9IjEyIiB4Mj0iMjIiIHkyPSIxMiIvPjxwYXRoIGQ9Ik0xMiAyYS0xNS4zLTE1LjMgMCAwIDEgNCAxMGEtMTUuMy0xNS4zIDAgMCAxLTQgMTAiLz48cGF0aCBkPSJNMTIgMmExNS4zLTE1LjMgMCAwIDAtNCAxMGEtMTUuMy0xNS4zIDAgMCAwIDQgMTAiLz48L3N2Zz4=',
+    
+    // 词典/书本图标 (📖 / Book) - 使用蓝色调
+    DICT: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjM2I4MmY2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTQgMTloMTZhMiAyIDAgMCAwIDItMlY1YTIgMiAwIDAgMC0yLTJINGEyIDIgMCAwIDAtMiAyVjE3YTIgMiAwIDAgMCAyIDJabTAgMCBWNSIvPjxwYXRoIGQ9Ik0xMiA1djE0Ii8+PC9zdmc+',
+    
+    // Ollama / 机器人图标 (🤖 / CPU/Robot) - 使用紫色调
+    OLLAMA: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjOGI1Y2Y2IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE2IiByeD0iMiIvPjxwYXRoIGQ9Ik04IDEwdjQiLz48cGF0aCBkPSJNMTYgMTB2NCIvPjxwYXRoIGQ9Ik02IDhoMTIiLz48cGF0aCBkPSJNNyAyMXYtMCIvPjxwYXRoIGQ9Ik0xNyAyMXYtMCIvPjxwYXRoIGQ9Ik0xMiA0VjIiLz48L3N2Zz4=',
+    
+    // 连接正常图标 (Check) - 保持绿色
+    READY: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMTBiOTgxIiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTIyIDExLjA4VjEyYTEwIDEwIDAgMSAxLTUuOTMtOS4xNCIvPjxwYXRoIGQ9Ik0yMiA0TDEyIDE0LjAxbDktMyIvPjwvc3ZnPg==',
+    
+    // 连接异常图标 (Alert) - 保持红色
+    WARNING: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjZWY0NDQ0IiBzdHJva2Utd2lkdGg9IjIiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCI+PHBhdGggZD0iTTEwLjI5IDMuOGE0LjI3IDQuMjcgMCAwIDEgNy40MiAwIDIsMiAwIDAgMSAwIDcuNDJhNC4yNyA0LjI3IDAgMCAxLTcuNDIgMHoiLz48bGluZSB4MT0iMTIiIHkxPSI4IiB4Mj0iMTIiIHkyPSIxMiIvPjxwYXRoIGQ9Ik0xMiAxNmguMDEiLz48L3N2Zz4='
+};
