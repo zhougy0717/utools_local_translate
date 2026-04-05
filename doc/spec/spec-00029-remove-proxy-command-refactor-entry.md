@@ -26,7 +26,46 @@
   </div>
 </div>
 
-### 2.2 逻辑调用链路
+### 2.2 核心架构变更与广播机制 (重写)
+在重构后，系统由“命令式驱动”转变为“事件驱动”，以解除渲染进程与主逻辑之间的直接耦合。
+
+#### 类图 (Architecture)
+```mermaid
+classDiagram
+    class EventEmitter {
+        <<interface>>
+        +on(event, listener)
+        +emit(event, ...args)
+    }
+    
+    class ProxyService {
+        +saveProxyConfig()
+        +closePanel()
+    }
+    
+    class BackendManager {
+        +init()
+        +reload()
+        -onProxyChanged()
+    }
+    
+    class DictBackend {
+        +queryWord()
+        -proxyConfig
+    }
+    
+    EventEmitter <|-- ProxyService : 继承/组合广播能力
+    ProxyService <.. BackendManager : 监听代理变更事件
+    ProxyService <.. DictBackend : 订阅配置以获取最新通知
+    BackendManager o-- DictBackend : 管理生命周期
+```
+
+#### 架构变更点：
+1. **去智化 `preload.js`**：取消了 `preload.js` 在 `window.openProxyConfigPanel()` 回调中手动执行 `BackendManager.reload()` 的逻辑。`preload.js` 现在仅作为一个 UI 路由，不再感知配置与后端的绑定逻辑。
+2. **事件源中心化 (`ProxyService`)**：`ProxyService` 负责维护代理状态并在配置变动（保存/关闭面板）时发出 `PROXY_CONFIG_CHANGED` 广播。
+3. **主动依赖 (`DictBackend` & `BackendManager`)**：`BackendManager` 或正在工作的词典后端现在需要感知 `ProxyService` 指送的事件，从而实现自我更新或即时重载，保持代理状态同步。
+
+### 2.3 逻辑处理流
 1. **渲染进程 (`dict-renderer.js`)**：
    - 监听 `#linkProxy` 的点击事件。
    - 调用 `window.parent._dictAPI.openProxyConfig()`。
@@ -35,7 +74,9 @@
    - 该函数调用主窗口环境下的 `window.openProxyConfigPanel()`。
 3. **主入口 (`preload.js`)**：
    - `window.openProxyConfigPanel()` 注入存放 `proxy-config.html` 的 iframe。
-   - 并在面板关闭后触发 `BackendManager.reload()` 以更新代理配置到各个后端实例。
+   - **[变更点]** 面板关闭后不再执行回调，仅仅是纯粹的 UI 卸载。
+4. **事件闭环**：
+   - `ProxyService` 发出 `proxy-changed` 广播 -> `BackendManager` 监听到 -> 执行 `this.reload()`，将最新的代理参数同步至各个翻译子模块。
 
 ### 2.3 命令卸载流程
 - **`src/commands/index.js`**：移除 `const proxyCommand = require('./proxy.js')` 以及 `COMMANDS` 数组中的 `proxyCommand`。
