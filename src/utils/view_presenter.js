@@ -1,4 +1,3 @@
-const { splitTextToLines } = require('./text_utils');
 
 /**
  * 组装正常的检索或翻译结果列表
@@ -19,43 +18,26 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
   } else if (!result.found || !result.translation) {
     list.push({ title: '未找到释义', description: searchWord });
   } else {
-    // 中→英：拼音放 description（小字），同一中文的多个英文释义拆成多条列表项
+    // 中→英：将多个释义用分号合并显示，不再拆条
     if (isZhToEn) {
       const pinyinPart = result.phonetic ? result.phonetic + ' · ' : '';
       const desc = pinyinPart + searchWord;
-      const parts = result.translation.split(/\s*;\s*/).map(s => s.trim()).filter(Boolean);
+      const translation = result.translation || '（无释义）';
 
-      if (parts.length === 0) {
-        list.push({ title: '（无释义）', description: searchWord });
-      } else {
-        const sourceLines = splitTextToLines(desc, 80);
-        parts.forEach((en, partIndex) => {
-          const translationLines = splitTextToLines(en, 80);
-          const maxLines = Math.max(translationLines.length, partIndex === 0 ? sourceLines.length : 0);
-
-          for (let i = 0; i < maxLines; i++) {
-            list.push({
-              title: (translationLines[i] || ' ').trim(),
-              description: (partIndex === 0 ? (sourceLines[i] || ' ') : ' ').trim() || ' ',
-              copyText: en
-            });
-          }
-        });
-      }
+      list.push({
+        title: translation.trim(),
+        description: desc.trim(),
+        copyText: translation
+      });
     } else {
-      // 英→中 或长自然段：使用分割函数按宽度截断显示
+      // 英→中 或长自然段：直接显示，不再按宽度截断拆分多行
       const fullTranslationText = [result.phonetic, result.translation].filter(Boolean).join(' ') || '（无释义）';
-      const translationLines = splitTextToLines(fullTranslationText, 80);
-      const sourceLines = splitTextToLines(searchWord, 80);
-      const maxLines = Math.max(translationLines.length, sourceLines.length);
-
-      for (let i = 0; i < maxLines; i++) {
-        list.push({
-          title: (translationLines[i] || ' ').trim(),
-          description: (sourceLines[i] || ' ').trim() || ' ',
-          copyText: fullTranslationText
-        });
-      }
+      
+      list.push({
+        title: fullTranslationText.trim(),
+        description: searchWord.trim(),
+        copyText: fullTranslationText
+      });
     }
   }
 

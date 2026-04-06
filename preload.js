@@ -1,7 +1,5 @@
 /**
- * 阶段零 Demo：在 uTools 中验证 preload 能访问并查询 resources/ecdict.db
- * 使用列表模式，enter 时显示欢迎词；search 时根据输入查词并展示。
- * 支持：用户先 Ctrl+C 复制选中文字，再打开插件时自动读取剪贴板并查词。
+ * uTools 翻译插件 Preload 核心入口
  */
 const BackendManager = require('./src/core/backend_manager');
 const ViewPresenter = require('./src/utils/view_presenter');
@@ -30,7 +28,7 @@ if (typeof window !== 'undefined') {
   window.stopLocalWorker = BackendManager.stop.bind(BackendManager);
 }
 
-const MAX_SELECTION_LENGTH = 200;
+const MAX_SELECTION_LENGTH = 5000;
 
 function applyEnterWithWord(word, callbackSetList) {
   const w = word.trim();
