@@ -40,7 +40,7 @@ function applyEnterWithWord(word, callbackSetList) {
 
   callbackSetList(ViewPresenter.buildLoadingItem(BackendManager.getLoadingMessage()));
 
-  // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的"请稍候"列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+  // 给 UI 进程 100ms 时间用于优先在查询前渲染上面的"请稍候"列表项
   setTimeout(() => {
     const startTime = Date.now();
     BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
@@ -49,13 +49,13 @@ function applyEnterWithWord(word, callbackSetList) {
     }, function (progressMsg) {
       callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
     });
-  }, 50);
+  }, 100);
 
   return true;
 }
 
 let searchTimeout = null;
-const DEBOUNCE_DELAY = 600;
+const DEBOUNCE_DELAY = 300;
 
 if (typeof window !== 'undefined') {
   window.exports = {
@@ -66,7 +66,7 @@ if (typeof window !== 'undefined') {
         enter: function (action, callbackSetList) {
           // 统一清理：确保关闭任何可能遗留的配置面板（实现零感知解耦）
           BackendManager.closeCurrentConfigPanel();
-          
+
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
             action && action.type === 'over' && typeof action.payload === 'string'
@@ -87,9 +87,6 @@ if (typeof window !== 'undefined') {
             searchTimeout = null;
           }
 
-          // 统一清理：移除当前挂载的所有动态 UI 容器（静默模式，防止输入框首个字符被吞）
-          BackendManager.closeCurrentConfigPanel(true);
-
           if (!searchWord || !searchWord.trim()) {
             callbackSetList([]);
             return;
@@ -104,23 +101,38 @@ if (typeof window !== 'undefined') {
           lastWordToSearch = w;
 
           searchTimeout = setTimeout(() => {
-            callbackSetList(ViewPresenter.buildLoadingItem(BackendManager.getLoadingMessage()));
+            // 提高清除界面的优先级
+            BackendManager.closeCurrentConfigPanel(true);
 
-            const sourceLang = UtoolsHelper.isLikelyChinese(w) ? 'zh' : 'en';
-            const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-            const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+            console.log('[Preload] Initiating first-render sequence...');
 
-            // 给 UI 进程 50ms 时间用于优先在查询前渲染上面的"请稍候"列表项，规避 WASM 强占 JS 线程引起的假死和白屏
+            // 步骤 1: 强制清空当前列表，打破 UI 引擎的批量合并
+            callbackSetList([]);
+
+            // 步骤 2: 在下一帧/微任务中渲染加载项，确保 UI 线程已捕捉到变更
             setTimeout(() => {
-              const startTime = Date.now();
-              BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
-                const costMs = Date.now() - startTime;
-                callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
-              }, function (progressMsg) {
-                callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
-              });
-            }, 50);
-          }, DEBOUNCE_DELAY);
+              const loadingMsg = BackendManager.getLoadingMessage();
+              console.log('[Preload] Rendering Loading Item:', loadingMsg);
+              callbackSetList(ViewPresenter.buildLoadingItem(loadingMsg));
+
+              const sourceLang = UtoolsHelper.isLikelyChinese(w) ? 'zh' : 'en';
+              const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
+              const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+
+              // 步骤 3: 进一步延长重绘保障期，给 UI 进程预留 150ms-200ms 的纯净渲染时间
+              setTimeout(() => {
+                const startTime = Date.now();
+                console.log('[Preload] Dispatching query to backend...');
+                BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
+                  const costMs = Date.now() - startTime;
+                  console.log('[Preload] Result received from backend');
+                  callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
+                }, function (progressMsg) {
+                  callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
+                });
+              }, 180);
+            }, 500);
+          }, 300);
         },
         select: function (action, itemData, callbackSetList) {
           console.log('[Preload] Select item:', itemData);
@@ -141,80 +153,82 @@ if (typeof window !== 'undefined') {
           if (itemData.isCommandContext) {
             Promise.resolve(CommandManager.handleSelect(itemData, appConfig.load(), callbackSetList))
               .then(signal => {
-              console.log('[Preload] Command signal:', signal);
-              if (!signal) return;
-              console.log('[Preload] Command signal resolved:', signal);
+                console.log('[Preload] Command signal:', signal);
+                if (!signal) return;
+                console.log('[Preload] Command signal resolved:', signal);
 
 
-              if (signal.openConfigPanel) {
-                console.log('[Preload] Opening config panel via BackendManager');
-                if (signal.reloadBackend) {
+                if (signal.openConfigPanel) {
+                  console.log('[Preload] Opening config panel via BackendManager');
+                  if (signal.reloadBackend) {
                     appConfig.clearCache();
                     const newConfig = appConfig.load();
                     const backendConfig = {
+                      resourcePath: newConfig.resourcePath || '',
+                      proxy: appConfig.getProxy(),
+                      backends: newConfig.backends
+                    };
+                    BackendManager.reload(backendConfig);
+                  }
+
+                  BackendManager.openConfigPanel(() => {
+                    console.log('[Preload] Config panel closed, reloading...');
+                    try {
+                      appConfig.clearCache();
+                      const newConfig = appConfig.load();
+                      const backendConfig = {
                         resourcePath: newConfig.resourcePath || '',
                         proxy: appConfig.getProxy(),
                         backends: newConfig.backends
+                      };
+                      BackendManager.reload(backendConfig);
+
+                      if (typeof utools !== 'undefined') {
+                        setTimeout(() => {
+                          utools.setSubInputValue('');
+                        }, 10);
+                      }
+                    } catch (e) {
+                      console.error('[Preload] Error in config callback:', e);
+                    }
+                  });
+                  return;
+                }
+
+                if (signal.autoComplete) {
+                  if (typeof utools !== 'undefined') {
+                    utools.setSubInputValue(signal.autoComplete);
+                  }
+                } else {
+                  if (signal.reloadBackend) {
+                    appConfig.clearCache();
+                    const updatedAppConfig = appConfig.load();
+                    const backendConfig = {
+                      resourcePath: updatedAppConfig.resourcePath || '',
+                      proxy: appConfig.getProxy(),
+                      backends: updatedAppConfig.backends,
+                      ollama: updatedAppConfig.ollama,
+                      libretranslate: updatedAppConfig.libretranslate
                     };
                     BackendManager.reload(backendConfig);
-                }
+                    console.log('[Preload][Mode] Backend reloaded for:', BackendManager.getBackendName());
+                  }
 
-                BackendManager.openConfigPanel(() => {
-                    console.log('[Preload] Config panel closed, reloading...');
-                    try {
-                        appConfig.clearCache();
-                        const newConfig = appConfig.load();
-                        const backendConfig = {
-                          resourcePath: newConfig.resourcePath || '',
-                          proxy: appConfig.getProxy(),
-                          backends: newConfig.backends
-                        };
-                        BackendManager.reload(backendConfig);
-
-                        if (typeof utools !== 'undefined') {
-                            setTimeout(() => {
-                              utools.setSubInputValue('');
-                            }, 10);
-                        }
-                    } catch (e) {
-                        console.error('[Preload] Error in config callback:', e);
+                  if (signal.restoreSearch) {
+                    const wordToRestore = lastWordToSearch || '';
+                    console.log('[Preload] Mode switch complete, restoring search word:', wordToRestore);
+                    if (wordToRestore) {
+                      // 仅仅设置输入框内容，并交给 uTools 的 search 回调处理，避免双重触发
+                      requestAnimationFrame(() => {
+                        utools.setSubInputValue(wordToRestore);
+                      });
                     }
-                });
-                return;
-              }
-
-              if (signal.autoComplete) {
-                if (typeof utools !== 'undefined') {
-                  utools.setSubInputValue(signal.autoComplete);
-                }
-              } else {
-                if (signal.reloadBackend) {
-                  appConfig.clearCache();
-                  const newConfig = appConfig.load();
-                  const backendConfig = {
-                    resourcePath: newConfig.resourcePath || '',
-                    proxy: appConfig.getProxy(),
-                    backends: newConfig.backends
-                  };
-                  BackendManager.reload(backendConfig);
-                }
-                if (signal.restoreSearch) {
-                  const wordToRestore = lastWordToSearch || '';
-                  // 如果有之前查询的单词且不是命令，自动触发翻译
-                  if (wordToRestore && !wordToRestore.startsWith('/')) {
-                    if (typeof utools !== 'undefined') {
-                      utools.setSubInputValue(wordToRestore);
-                    }
-                    applyEnterWithWord(wordToRestore, callbackSetList);
-                  } else if (typeof utools !== 'undefined') {
-                    utools.setSubInputValue(wordToRestore);
                   }
                 }
-              }
-            })
-            .catch(err => {
-              console.error('[Preload] Command handleSelect error:', err);
-            });
+              })
+              .catch(err => {
+                console.error('[Preload] Command handleSelect error:', err);
+              });
             return;
           }
 

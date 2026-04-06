@@ -42,102 +42,120 @@ class OllamaBackend {
      * @param {string} sourceLang - 源语言代码 (例如 'en')
      * @param {string} targetLang - 目标语言代码 (例如 'zh')
      * @param {function} callback - 完成回调 function(err, result)
-     * @param {function} progressCallback - 进度回调 (暂不用)
+     * @param {function} progressCallback - 进度回调 (用于展示查词状态)
      */
     queryWord(text, sourceLang, targetLang, callback, progressCallback = null) {
-        if (!this.config.model) {
-            return callback(null, {
-                found: false,
-                message: 'Ollama 模型名称未配置。请在配置页中选择或输入模型名称。'
-            });
-        }
+        const queryId = Math.random().toString(36).substring(7);
+        console.log(`[OllamaBackend][${queryId}] queryWord started for:`, text.substring(0, 10));
 
-        // 处理目标语言占位符
-        let targetLangText = '目标语言';
-        if (targetLang === 'zh') targetLangText = '中文';
-        else if (targetLang === 'en') targetLangText = '英文';
+        // 强制进入下一个事件循环，确保 UI 线程能优先渲染加载中的 Loading 列表项
+        setTimeout(() => {
+            console.log(`[OllamaBackend][${queryId}] Entering async block`);
+            if (typeof progressCallback === 'function') {
+                progressCallback('正在连接 Ollama 并准备翻译...');
+            }
 
-        const systemPrompt = this.config.prompt.replace(/\$\{target_lang\}/g, targetLangText);
+            // 再次确认配置已加载
+            if (!this.config || !this.config.model) {
+                console.log(`[OllamaBackend][${queryId}] Config model missing, reloading...`);
+                this.reloadConfig();
+            }
 
-        const payload = {
-            model: this.config.model,
-            temperature: this.config.temperature,
-            stream: false,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: text }
-            ]
-        };
+            if (!this.config.model) {
+                console.log(`[OllamaBackend][${queryId}] Still no model after reload`);
+                return callback(null, {
+                    found: false,
+                    message: 'Ollama 模型名称未配置。请在配置页中选择或输入模型名称。'
+                });
+            }
 
-        const fetchOptions = {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.config.apiKey}`
-            },
-            body: JSON.stringify(payload)
-        };
+            // 处理目标语言占位符
+            let targetLangText = '目标语言';
+            if (targetLang === 'zh') targetLangText = '中文';
+            else if (targetLang === 'en') targetLangText = '英文';
 
-        // 支持请求中断
-        if (typeof AbortController !== 'undefined') {
-            this.currentAbortController = new AbortController();
-            fetchOptions.signal = this.currentAbortController.signal;
-        }
+            const systemPrompt = this.config.prompt.replace(/\$\{target_lang\}/g, targetLangText);
 
-        let apiBase = (this.config.apiBase || '').trim().replace(/\/+$/, '');
-        if (apiBase && !apiBase.endsWith('/v1')) {
-            apiBase += '/v1';
-        }
-        const endpoint = `${apiBase}/chat/completions`;
+            const payload = {
+                model: this.config.model,
+                temperature: this.config.temperature,
+                stream: false,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: text }
+                ]
+            };
 
-        // 根据 useProxy 决定请求方式：true 则使用全局（由系统代理或 fetch 自动处理），false 则强制直连
-        const requestPromise = this.config.useProxy 
-            ? fetch(endpoint, fetchOptions)
-            : this._request(endpoint, fetchOptions);
+            const fetchOptions = {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.config.apiKey}`
+                },
+                body: JSON.stringify(payload)
+            };
 
-        requestPromise
-            .then(res => {
-                if (!res.ok) {
-                    throw new Error(`HTTP 异常状态码: ${res.status}`);
-                }
-                return res.json();
-            })
-            .then(data => {
-                if (this.workerStopping) {
-                    this.workerStopping = false;
-                    return; // 被中断
-                }
+            // 支持请求中断
+            if (typeof AbortController !== 'undefined') {
+                this.currentAbortController = new AbortController();
+                fetchOptions.signal = this.currentAbortController.signal;
+            }
 
-                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-                    const translation = data.choices[0].message.content.trim();
-                    callback(null, {
-                        found: true,
-                        translation: translation,
-                        phonetic: '' // LLM 翻译通常不提供音标
-                    });
-                } else {
+            let apiBase = (this.config.apiBase || '').trim().replace(/\/+$/, '');
+            if (apiBase && !apiBase.endsWith('/v1')) {
+                apiBase += '/v1';
+            }
+            const endpoint = `${apiBase}/chat/completions`;
+
+            // 根据 useProxy 决定请求方式：true 则使用全局，false 则强制直连
+            const requestPromise = this.config.useProxy 
+                ? fetch(endpoint, fetchOptions)
+                : this._request(endpoint, fetchOptions);
+
+            requestPromise
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP 异常状态码: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (this.workerStopping) {
+                        this.workerStopping = false;
+                        return; // 被中断
+                    }
+
+                    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                        const translation = data.choices[0].message.content.trim();
+                        callback(null, {
+                            found: true,
+                            translation: translation,
+                            phonetic: '' // LLM 翻译通常不提供音标
+                        });
+                    } else {
+                        callback(null, {
+                            found: false,
+                            message: 'Ollama 接口返回格式异常，未找到翻译内容。'
+                        });
+                    }
+                })
+                .catch(err => {
+                    if (err.name === 'AbortError') {
+                        // 用户取消请求
+                        return;
+                    }
+                    
+                    let errorMsg = `API 请求失败: ${err.message}`;
+                    if (err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('ECONNREFUSED')) {
+                        errorMsg = `无法连接到 Ollama 服务 (${this.config.apiBase})，请确认 Ollama 已启动且地址正确。`;
+                    }
+                    
                     callback(null, {
                         found: false,
-                        message: 'Ollama 接口返回格式异常，未找到翻译内容。'
+                        message: errorMsg
                     });
-                }
-            })
-            .catch(err => {
-                if (err.name === 'AbortError') {
-                    // 用户取消请求
-                    return;
-                }
-                
-                let errorMsg = `API 请求失败: ${err.message}`;
-                if (err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('ECONNREFUSED')) {
-                    errorMsg = `无法连接到 Ollama 服务 (${this.config.apiBase})，请确认 Ollama 已启动且地址正确。`;
-                }
-                
-                callback(null, {
-                    found: false,
-                    message: errorMsg
                 });
-            });
+        }, 0);
     }
 
     /**

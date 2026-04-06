@@ -1,5 +1,6 @@
 const path = require('path');
 const { PromptManager } = require('./prompt-manager');
+const { toNamingStyles } = require('../../utils/text_utils');
 
 /**
  * 进阶翻译面板服务
@@ -46,8 +47,11 @@ class AdvancedPanelService {
         };
       },
       // 获取初始提示词
-      getInitialPrompt: (inputText, targetLangCode) => {
-        const template = this.promptManager.getDefaultTemplate();
+      getInitialPrompt: (inputText, targetLangCode, taskType = 'advanced') => {
+        const template = taskType === 'naming' 
+          ? this.promptManager.templates.naming 
+          : this.promptManager.getDefaultTemplate();
+
         let targetLang = '中文';
         if (targetLangCode === 'en') targetLang = '英文';
         else if (targetLangCode === 'ja') targetLang = '日语';
@@ -56,6 +60,12 @@ class AdvancedPanelService {
           text: inputText,
           targetLang: targetLang
         });
+      },
+      // 暴露命各风格格式化工具
+      formatNaming: (phrase) => toNamingStyles(phrase),
+      // 复制文本
+      copyText: (text) => {
+        if (typeof utools !== 'undefined') utools.copyText(text);
       },
       // 执行翻译任务 (非流式实现，确保稳定性)
       translate: async (payload) => {

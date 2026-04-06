@@ -73,11 +73,13 @@ function buildLoadingItem(loadingMessage = '正在检索中...') {
 }
 
 /**
- * 组装词典构建进度的列表项
+ * 组装查词或词典构建进度的列表项
  * @param {string} progressMsg - 进度提示文案
  */
 function buildProgressItem(progressMsg) {
-  return [{ title: '词典自动构建中...', description: progressMsg }];
+  const isDictTask = progressMsg.includes('下载') || progressMsg.includes('构建') || progressMsg.includes('解压');
+  const title = isDictTask ? '词典状态同步' : '⏳ 正在拼命翻译中...';
+  return [{ title: title, description: progressMsg }];
 }
 
 module.exports = {
