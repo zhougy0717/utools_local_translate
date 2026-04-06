@@ -1,0 +1,62 @@
+<h2>变量命名增强：原文置底渲染</h2>
+<p class="subtitle">AI 建议在上方，结果在中间，原文保持在底部区域</p>
+
+<div class="mockup" style="border: 2px solid #2563eb; border-radius: 8px;">
+  <div class="mockup-header" style="background: #2563eb; color: white;">变量命名增强版 v4 (结构对齐)</div>
+  <div class="mockup-body" style="padding: 20px; background: #fff; display: flex; flex-direction: column; gap: 24px;">
+    
+    <!-- 1. AI 建议 -->
+    <div class="section">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 8px;">AI 建议候选词</div>
+      <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;">
+        <span class="option active" style="padding: 6px 16px; border-radius: 20px; border: 1px solid #2563eb; background: #eff6ff; color: #2563eb; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">apply discount</span>
+        <span class="option" style="padding: 6px 16px; border-radius: 20px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 13px; cursor: pointer; white-space: nowrap;">fetch member discount</span>
+        <span class="option" style="padding: 6px 16px; border-radius: 20px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 13px; cursor: pointer; white-space: nowrap;">get active benefit</span>
+      </div>
+    </div>
+
+    <!-- 2. 核心结果 (分列显示英文风格名) -->
+    <div class="section" style="flex: 1;">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 12px;">格式化结果</div>
+      <div style="display: grid; gap: 15px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 110px; flex-shrink: 0; line-height: 1.3;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">大驼峰</div>
+            <div style="font-size: 10px; color: #94a3b8;">PascalCase</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px;" value="ApplyDiscount">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: white; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 110px; flex-shrink: 0; line-height: 1.3;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">小驼峰</div>
+            <div style="font-size: 10px; color: #94a3b8;">camelCase</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px;" value="applyDiscount">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: white; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 原文 (恢复置底) -->
+    <div class="section" style="border-top: 1px dashed #e2e8f0; padding-top: 15px;">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 8px;">原文 (可编辑)</div>
+      <div class="mock-input" style="width: 100%; height: 60px; padding: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #64748b;">
+        提取激活会员的折扣
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section" style="margin-top: 30px;">
+  <h3>🔄 结构调整完毕：</h3>
+  <ul>
+    <li><b>布局还原</b>：遵循原先版本的设计习惯，即【结果在前，原文在后】。</li>
+    <li><b>全量信息</b>：在保持原先布局的基础上，嵌入了单行 AI 建议和两行式的标题信息。</li>
+  </ul>
+</div>

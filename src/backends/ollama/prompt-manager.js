@@ -31,11 +31,38 @@ class PromptManager {
   }
 
   /**
-   * 获取默认模板 (进阶翻译)
-   * @returns {string}
+   * 基于任务类型获取并构建 Prompt
+   * @param {string} taskType - advanced | naming
+   * @param {Object} context - { text, targetLangCode }
    */
-  getDefaultTemplate() {
-    return this.templates.advanced;
+  getPrompt(taskType, context) {
+    const template = taskType === 'naming' ? this.templates.naming : this.templates.advanced;
+    
+    // 语言代码转文字
+    let targetLang = '中文';
+    const code = context.targetLangCode || context.targetLang; // 兼容旧参数名
+    if (code === 'en') targetLang = '英文';
+    else if (code === 'ja') targetLang = '日语';
+    else if (code === 'ko') targetLang = '韩语';
+
+    return this.buildPrompt(template, {
+      text: context.text,
+      targetLang: targetLang
+    });
+  }
+
+  /**
+   * 获取 Prompt 模板 (仅替换语言，保留 [TEXT] 占位符供 UI 使用)
+   */
+  getPromptTemplate(taskType, targetLangCode) {
+    const template = taskType === 'naming' ? this.templates.naming : this.templates.advanced;
+    
+    let targetLang = '中文';
+    if (targetLangCode === 'en') targetLang = '英文';
+    else if (targetLangCode === 'ja') targetLang = '日语';
+    else if (targetLangCode === 'ko') targetLang = '韩语';
+
+    return template.replace(/\[TARGET_LANG\]/g, targetLang);
   }
 
   /**

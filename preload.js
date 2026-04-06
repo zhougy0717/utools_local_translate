@@ -143,7 +143,7 @@ if (typeof window !== 'undefined') {
           // 如果用户点击的是进阶翻译项
           if (itemData.isAdvancedOllama) {
             console.log('[Preload] Entering advanced translation center');
-            BackendManager.openAdvancedPanel(itemData.searchWord, itemData.targetLangCode);
+            BackendManager.openAdvancedPanel(itemData.searchWord, itemData.targetLangCode, itemData.initialResult, itemData.backendName);
             return;
           }
 

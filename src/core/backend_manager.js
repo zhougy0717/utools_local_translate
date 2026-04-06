@@ -87,9 +87,9 @@ class BackendManager {
    * @returns {string}
    */
   getBackendName() {
-    if (this.currentConfig.backends.libretranslate) return 'LibreTranslate 查询时延';
-    if (this.currentConfig.backends.ollama) return 'Ollama 查询时延';
-    return '词典查询时延';
+    if (this.currentConfig.backends.libretranslate) return 'LibreTranslate';
+    if (this.currentConfig.backends.ollama) return 'Ollama';
+    return '本地词典';
   }
 
   /**
@@ -145,7 +145,7 @@ class BackendManager {
    * @param {string} text - 待处理的原始文本
    * @param {string} targetLangCode - 目标语言代码 ('en', 'zh' 等)
    */
-  openAdvancedPanel(text, targetLangCode) {
+  openAdvancedPanel(text, targetLangCode, initialResult = '', backendName = '') {
     // 方案：如果当前 activeBackend 就是 Ollama，直接复用；否则从配置中创建一个专用实例。
     let targetBackend = null;
     if (this.activeBackend && this.activeBackend.constructor.name === 'OllamaBackend') {
@@ -159,7 +159,7 @@ class BackendManager {
 
     this.advancedPanelService.openPanel(text, () => {
       // 面板关闭时的处理（如需要刷新主列表）
-    }, targetBackend, targetLangCode);
+    }, targetBackend, targetLangCode, initialResult, backendName);
   }
 
   /**

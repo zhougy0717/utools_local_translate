@@ -1,0 +1,85 @@
+<h2>变量命名增强：风格英文名换行显示</h2>
+<p class="subtitle">AI 建议单行排布，风格名称分行展示（中文+小字英文）</p>
+
+<div class="mockup" style="border: 2px solid #2563eb; border-radius: 8px;">
+  <div class="mockup-header" style="background: #2563eb; color: white;">变量命名增强版 v3 (最终构想)</div>
+  <div class="mockup-body" style="padding: 20px; background: #fff;">
+    
+    <div class="section">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold;">待命名原文</div>
+      <div class="mock-input" style="width: 100%; height: 50px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; margin-bottom: 20px; font-size: 13px;">
+        提取激活会员的折扣
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 8px;">AI 建议词 (单行)</div>
+      <div style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px;">
+        <span class="option active" style="padding: 4px 14px; border-radius: 16px; border: 1px solid #2563eb; background: #eff6ff; color: #2563eb; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;">apply discount</span>
+        <span class="option" style="padding: 4px 14px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 13px; cursor: pointer; white-space: nowrap;">fetch member discount</span>
+        <span class="option" style="padding: 4px 14px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 13px; cursor: pointer; white-space: nowrap;">get active benefit</span>
+        <span class="option" style="padding: 4px 14px; border-radius: 16px; border: 1px solid #e2e8f0; background: #fff; color: #64748b; font-size: 13px; cursor: pointer; white-space: nowrap;">resolve promo</span>
+      </div>
+    </div>
+
+    <!-- 用户要求的风格英文名在第二行 -->
+    <div class="section" style="margin-top: 20px;">
+      <div class="label" style="font-size: 11px; color: #94a3b8; font-weight: bold; margin-bottom: 12px;">格式化命名结果</div>
+      <div style="display: grid; gap: 14px;">
+        
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 100px; flex-shrink: 0; line-height: 1.2;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">大驼峰</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: sans-serif;">PascalCase</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px; color: #1e293b;" value="ApplyDiscount">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: #fff; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 100px; flex-shrink: 0; line-height: 1.2;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">小驼峰</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: sans-serif;">camelCase</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px; color: #1e293b;" value="applyDiscount">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: #fff; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 100px; flex-shrink: 0; line-height: 1.2;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">下划线</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: sans-serif;">snake_case</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px; color: #1e293b;" value="apply_discount">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: #fff; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="width: 100px; flex-shrink: 0; line-height: 1.2;">
+            <div style="font-size: 13px; font-weight: 600; color: #334155;">常量名</div>
+            <div style="font-size: 10px; color: #94a3b8; margin-top: 2px; font-family: sans-serif;">CONSTANT_CASE</div>
+          </div>
+          <div style="flex: 1; display: flex; gap: 8px;">
+            <input readonly style="flex: 1; padding: 7px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; font-family: monospace; font-size: 13px; color: #1e293b;" value="APPLY_DISCOUNT">
+            <button style="padding: 0 12px; font-size: 11px; color: #2563eb; background: #fff; border: 1px solid #2563eb; border-radius: 4px; cursor: pointer;">复制</button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 30px;">
+  <h3>✨ 最终细节确认：</h3>
+  <ul>
+    <li><b>垂直对齐</b>：由于增加了第二行英文名，左侧标签现在采用顶端对齐，整体分布更均匀。</li>
+    <li><b>信息密度</b>：这种分两行排布的方式，既保留了中文的易读性，又兼顾了开发时的专业性。</li>
+  </ul>
+</div>

@@ -48,7 +48,9 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
     description: '基于 AI 提供深度润色、语法剖析与多风格翻译',
     isAdvancedOllama: true,
     searchWord: searchWord,
-    targetLangCode: targetLangCode
+    targetLangCode: targetLangCode,
+    initialResult: result.translation || '',
+    backendName: backendName
   });
 
   // 独立追加时延统计项

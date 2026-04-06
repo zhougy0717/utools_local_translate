@@ -70,10 +70,10 @@ function switchTask(task) {
 }
 
 /**
- * 更新提示词
+ * 更新提示词 (使用占位符模板)
  */
 function refreshPrompt() {
-  UI.promptInput.value = Bridge.getInitialPrompt(UI.sourceInput.value, UI.langSelect.value, currentTask);
+  UI.promptInput.value = Bridge.getInitialPrompt(UI.langSelect.value, currentTask);
 }
 
 /**
@@ -183,10 +183,20 @@ async function handleTask() {
     Object.values(UI.namingInputs).forEach(input => { input.value = ''; });
   }
 
+  // 核心修复：在这里动态合并原文到提示词
+  let finalPrompt = prompt;
+  if (finalPrompt.includes('[TEXT]')) {
+    // 使用全局替换，防止用户多次使用占位符
+    finalPrompt = finalPrompt.replace(/\[TEXT\]/g, text);
+  } else {
+    // 如果用户不慎删除了占位符，但在原文区输入了内容，则静默追加以确保翻译生效
+    finalPrompt = `${finalPrompt}\n\n[附带原文内容]:\n${text}`;
+  }
+
   try {
     const result = await Bridge.translate({
       text,
-      prompt,
+      prompt: finalPrompt,
       model,
       targetLang
     });
@@ -241,6 +251,15 @@ async function init() {
   // 初始化提示词
   refreshPrompt();
 
+  // 如果已有初始翻译结果，则直接显示
+  if (config.initialResult) {
+    UI.resultText.textContent = config.initialResult;
+    const sourceMsg = config.initialBackendName ? `结果来自: ${config.initialBackendName}` : '已有翻译结果';
+    updateStatus(true, sourceMsg);
+  } else {
+    UI.resultText.textContent = '等待翻译...';
+  }
+
   // 按钮事件
   UI.btnExecute.addEventListener('click', handleTask);
   UI.btnConfig.addEventListener('click', () => Bridge.openOllamaConfig());
@@ -271,11 +290,9 @@ async function init() {
 
   // 实况状态检查
   const check = await Bridge.checkStatus();
-  updateStatus(check.online, check.message);
-  
-  // 自动触发首次执行 (如果初始内容不为空)
-  if (UI.sourceInput.value.trim()) {
-    handleTask();
+  // 仅在没有已有结果的情况下更新状态栏信息，避免冲掉后端来源显示
+  if (!config.initialResult) {
+    updateStatus(check.online, check.message);
   }
 }
 

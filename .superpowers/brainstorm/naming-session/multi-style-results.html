@@ -1,0 +1,95 @@
+<h2>变量命名：多风格并列视图</h2>
+<p class="subtitle">根据你的手绘原型，我们将翻译结果区替换为多风格列表</p>
+
+<div class="mockup">
+  <div class="mockup-header">变量命名功能 (功能中心)</div>
+  <div class="mockup-body" style="height: 450px; display: flex; flex-direction: column;">
+    <!-- 顶部工具栏 -->
+    <div style="height: 40px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 10px; gap: 15px; font-size: 11px;">
+      <div style="font-weight: bold; font-size: 12px;">Ollama 进阶翻译</div>
+      <div style="border: 1px solid #cbd5e1; background: white; padding: 2px 8px; border-radius: 4px;">选择语言 ▾</div>
+      <div style="border: 1px solid #cbd5e1; background: white; padding: 2px 8px; border-radius: 4px;">选择模型 ▾</div>
+      <button class="mock-button" style="padding: 3px 10px; background: #2563eb; color: white;">执行命名</button>
+      <div style="margin-left: auto;">⚙️</div>
+    </div>
+    
+    <div style="flex: 1; display: flex;">
+      <!-- 侧边栏 -->
+      <div style="width: 100px; background: #f8fafc; border-right: 1px solid #e2e8f0; padding: 10px;">
+        <div class="nav-item">进阶翻译</div>
+        <div class="nav-item active">变量命名</div>
+        <div class="nav-item" style="opacity: 0.5;">功能 3</div>
+      </div>
+      
+      <!-- 主内容区 -->
+      <div style="flex: 1; padding: 15px; display: flex; flex-direction: column; gap: 10px; font-size: 13px; overflow-y: auto;">
+        
+        <!-- 多风格结果区 -->
+        <div style="background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 6px; padding: 10px; display: flex; flex-direction: column; gap: 8px;">
+           <label style="font-size: 10px; color: #64748b; font-weight: bold; text-transform: uppercase;">命名结果</label>
+           
+           <div style="display: flex; align-items: center; gap: 10px;">
+             <span style="width: 60px; font-weight: bold; color: #475569;">大驼峰</span>
+             <div style="flex: 1; background: white; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #1e293b;">UserLoginService</div>
+             <button style="font-size: 10px; padding: 4px 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; border-radius: 4px;">复制</button>
+           </div>
+
+           <div style="display: flex; align-items: center; gap: 10px;">
+             <span style="width: 60px; font-weight: bold; color: #475569;">小驼峰</span>
+             <div style="flex: 1; background: white; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #1e293b;">userLoginService</div>
+             <button style="font-size: 10px; padding: 4px 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; border-radius: 4px;">复制</button>
+           </div>
+
+           <div style="display: flex; align-items: center; gap: 10px;">
+             <span style="width: 60px; font-weight: bold; color: #475569;">下划线</span>
+             <div style="flex: 1; background: white; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #1e293b;">user_login_service</div>
+             <button style="font-size: 10px; padding: 4px 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; border-radius: 4px;">复制</button>
+           </div>
+
+           <div style="display: flex; align-items: center; gap: 10px;">
+             <span style="width: 60px; font-weight: bold; color: #475569;">常量名</span>
+             <div style="flex: 1; background: white; border: 1px solid #e2e8f0; padding: 4px 8px; border-radius: 4px; color: #1e293b;">USER_LOGIN_SERVICE</div>
+             <button style="font-size: 10px; padding: 4px 8px; border: 1px solid #cbd5e1; background: white; cursor: pointer; border-radius: 4px;">复制</button>
+           </div>
+        </div>
+
+        <!-- 原文区 -->
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 10px; color: #64748b; font-weight: bold;">原文</label>
+          <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; min-height: 40px; background: white;">用户登录服务</div>
+        </div>
+
+        <!-- 提示词区 -->
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <label style="font-size: 10px; color: #64748b; font-weight: bold;">提示词</label>
+          <div style="border: 1px solid #e2e8f0; border-radius: 4px; padding: 8px; min-height: 40px; background: white; color: #94a3b8; font-size: 11px;">
+            请根据语境生成符合规范的变量名...
+          </div>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>实现逻辑建议</h3>
+  <div class="options" data-choice="logic">
+    <div class="option" data-choice="js-format" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>本地 JS 格式化</h3>
+        <p>AI 只生成单词短语（如 "user login service"），本地通过程序转换为各种风格。</p>
+        <p class="subtitle">更稳定，Token 更省，几乎无延迟。</p>
+      </div>
+    </div>
+    <div class="option" data-choice="ai-direct" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>AI 直接生成全部风格</h3>
+        <p>让 AI 返回一个 JSON 结果，包含所有命名风格。</p>
+        <p class="subtitle">更能利用 AI 的灵活性，但会有一定延迟。</p>
+      </div>
+    </div>
+  </div>
+</div>

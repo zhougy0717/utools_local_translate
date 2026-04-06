@@ -11,6 +11,8 @@ class AdvancedPanelService {
     this.isOpen = false;
     this.containerId = 'ollama-advanced-panel-container';
     this.initialText = '';
+    this.initialResult = '';
+    this.initialBackendName = '';
     this.promptManager = new PromptManager();
     this._onPanelClose = null;
   }
@@ -21,13 +23,17 @@ class AdvancedPanelService {
    * @param {Function} onCloseCallback - 面板关闭后的回调
    * @param {OllamaBackend} backend - 当前使用的 Ollama 后端实例
    * @param {string} targetLangCode - 初始目标语言
+   * @param {string} initialResult - 预填充的已有翻译结果
+   * @param {string} backendName - 已有翻译结果的来源后端名
    */
-  openPanel(text = '', onCloseCallback = null, backend = null, targetLangCode = 'zh') {
+  openPanel(text = '', onCloseCallback = null, backend = null, targetLangCode = 'zh', initialResult = '', backendName = '') {
     if (typeof document === 'undefined') return;
 
     this.isOpen = true;
     this.initialText = text;
     this.targetLangCode = targetLangCode;
+    this.initialResult = initialResult;
+    this.initialBackendName = backendName;
     this._onPanelClose = onCloseCallback;
 
     if (typeof utools !== 'undefined') {
@@ -42,24 +48,15 @@ class AdvancedPanelService {
         return {
           initialText: this.initialText,
           initialTargetLang: this.targetLangCode,
+          initialResult: this.initialResult,
+          initialBackendName: this.initialBackendName,
           models: config.models || [],
           currentModel: config.model || ''
         };
       },
-      // 获取初始提示词
-      getInitialPrompt: (inputText, targetLangCode, taskType = 'advanced') => {
-        const template = taskType === 'naming' 
-          ? this.promptManager.templates.naming 
-          : this.promptManager.getDefaultTemplate();
-
-        let targetLang = '中文';
-        if (targetLangCode === 'en') targetLang = '英文';
-        else if (targetLangCode === 'ja') targetLang = '日语';
-        
-        return this.promptManager.buildPrompt(template, {
-          text: inputText,
-          targetLang: targetLang
-        });
+      // 获取初始提示词 (保留 [TEXT] 占位符，由渲染器在执行时动态替换)
+      getInitialPrompt: (targetLangCode, taskType = 'advanced') => {
+        return this.promptManager.getPromptTemplate(taskType, targetLangCode);
       },
       // 暴露命各风格格式化工具
       formatNaming: (phrase) => toNamingStyles(phrase),
@@ -71,48 +68,27 @@ class AdvancedPanelService {
       translate: async (payload) => {
         if (!backend) return { success: false, error: 'Ollama 后端未初始化' };
         
-        return new Promise((resolve) => {
-          // 这里的 backend.queryWord 逻辑是直接发送给接口。
-          // 我们需要更精细地控制 Prompt。目前 queryWord 内部写死了系统提示词。
-          // 为满足进阶需求，我们可能需要临时修改 backend 配置或调用其内部请求逻辑。
-          // 方案：使用 backend 的配置进行请求，但直接向消息体发送用户自定义内容。
-          
-          let apiBase = (backend.config.apiBase || '').trim().replace(/\/+$/, '');
-          if (apiBase && !apiBase.endsWith('/v1')) {
-            apiBase += '/v1';
-          }
-          const endpoint = `${apiBase}/chat/completions`;
-          
-          const requestPayload = {
-            model: payload.model || backend.config.model,
+        try {
+          const data = await backend.fetchChat({
+            model: payload.model,
             messages: [
-              { role: 'user', content: payload.prompt } // 进阶模式下，prompt 已经是包含了原文的完整指令
+              { role: 'user', content: payload.prompt }
             ],
             stream: false
-          };
+          });
 
-          backend._request(endpoint, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${backend.config.apiKey}`
-            },
-            body: JSON.stringify(requestPayload)
-          })
-          .then(res => res.json())
-          .then(data => {
-            if (data.choices && data.choices.length > 0) {
-              resolve({ 
-                success: true, 
-                translation: data.choices[0].message.content.trim(),
-                usage: (data.usage?.total_tokens || 0)
-              });
-            } else {
-              resolve({ success: false, error: '接口未返回有效翻译' });
-            }
-          })
-          .catch(e => resolve({ success: false, error: e.message }));
-        });
+          if (data.choices && data.choices.length > 0) {
+            return { 
+              success: true, 
+              translation: data.choices[0].message.content.trim(),
+              usage: (data.usage?.total_tokens || 0)
+            };
+          } else {
+            return { success: false, error: '接口未返回有效内容' };
+          }
+        } catch (e) {
+          return { success: false, error: e.message };
+        }
       },
       // 检查服务状态
       checkStatus: async () => {

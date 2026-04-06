@@ -1,0 +1,77 @@
+<h2>变量命名：交互方案选择</h2>
+<p class="subtitle">在当前 Ollama 进阶翻译中心内增加变量命名功能</p>
+
+<div class="split">
+  <div class="mockup">
+    <div class="mockup-header">方案 A：顶部动态切换 (推荐)</div>
+    <div class="mockup-body" style="height: 300px; display: flex; flex-direction: column;">
+      <div style="height: 40px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 10px; gap: 10px;">
+        <div style="font-size: 12px; font-weight: bold;">Ollama 进阶中心</div>
+        <select style="font-size: 11px;"><option>🐫 小驼峰 (camelCase)</option><option>PascalCase</option><option>snake_case</option></select>
+        <button class="mock-button" style="padding: 2px 8px; font-size: 11px;">执行</button>
+      </div>
+      <div style="flex: 1; display: flex;">
+        <div style="width: 80px; background: #f8fafc; border-right: 1px solid #e2e8f0; padding: 5px;">
+          <div class="nav-item">进阶翻译</div>
+          <div class="nav-item active">变量命名</div>
+        </div>
+        <div style="flex: 1; padding: 10px; font-size: 12px;">
+          <div class="placeholder" style="height: 60px; margin-bottom: 5px;">结果: user_login_service</div>
+          <div class="placeholder" style="height: 40px; margin-bottom: 5px;">原文: 用户登录服务</div>
+          <div class="placeholder" style="height: 40px;">提示词: ...生成[STYLE]风格变量名...</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>顶部“语言选择”动态变更为“风格选择”。</p>
+      <button class="btn-execute" style="width: 100%" data-choice="a" onclick="toggleSelect(this)">选择方案 A</button>
+    </div>
+  </div>
+
+  <div class="mockup">
+    <div class="mockup-header">方案 B：风格快捷标签</div>
+    <div class="mockup-body" style="height: 300px; display: flex; flex-direction: column;">
+      <div style="height: 40px; background: #f1f5f9; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; padding: 0 10px;">
+        <div style="font-size: 12px; font-weight: bold;">Ollama 进阶中心</div>
+      </div>
+      <div style="flex: 1; display: flex;">
+        <div style="width: 80px; background: #f8fafc; border-right: 1px solid #e2e8f0; padding: 5px;">
+          <div class="nav-item">进阶翻译</div>
+          <div class="nav-item active">变量命名</div>
+          <div style="font-size: 10px; color: #64748b; margin-top: 10px; margin-bottom: 5px;">风格:</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 2px;">
+             <span style="background: white; border: 1px solid #2563eb; color: #2563eb; padding: 1px 3px; font-size: 9px; cursor: pointer;">Camel</span>
+             <span style="background: #e2e8f0; padding: 1px 3px; font-size: 9px; cursor: pointer;">Snake</span>
+             <span style="background: #e2e8f0; padding: 1px 3px; font-size: 9px; cursor: pointer;">Constant</span>
+          </div>
+        </div>
+        <div style="flex: 1; padding: 10px; font-size: 12px;">
+          <div class="placeholder" style="height: 60px; margin-bottom: 5px;">结果: UserLoginService</div>
+          <div class="placeholder" style="height: 40px; margin-bottom: 5px;">原文: 用户登录服务</div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <p>侧边栏提供快速风格切换按钮。</p>
+      <button class="btn-execute" style="width: 100%" data-choice="b" onclick="toggleSelect(this)">选择方案 B</button>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>方案 A 优点</h4>
+    <ul>
+      <li>符合主工具栏交互语境</li>
+      <li>节省侧边栏垂直高度</li>
+      <li>易于扩展更多风格</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>方案 B 优点</h4>
+    <ul>
+      <li>单次点击即可切换，效率极高</li>
+      <li>操作逻辑更集中</li>
+    </ul>
+  </div>
+</div>

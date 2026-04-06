@@ -2,6 +2,8 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const { OllamaConfig } = require('./config');
+const { PromptManager } = require('./prompt-manager');
+
 
 /**
  * Ollama API 翻译后端驱动
@@ -19,6 +21,7 @@ class OllamaBackend {
         }
         this.workerStopping = false;
         this.currentAbortController = null;
+        this.promptManager = new PromptManager();
     }
 
     /**
@@ -49,7 +52,7 @@ class OllamaBackend {
         console.log(`[OllamaBackend][${queryId}] queryWord started for:`, text.substring(0, 10));
 
         // 强制进入下一个事件循环，确保 UI 线程能优先渲染加载中的 Loading 列表项
-        setTimeout(() => {
+        setTimeout(async () => {
             console.log(`[OllamaBackend][${queryId}] Entering async block`);
             if (typeof progressCallback === 'function') {
                 progressCallback('正在连接 Ollama 并准备翻译...');
@@ -57,106 +60,112 @@ class OllamaBackend {
 
             // 再次确认配置已加载
             if (!this.config || !this.config.model) {
-                console.log(`[OllamaBackend][${queryId}] Config model missing, reloading...`);
                 this.reloadConfig();
             }
 
             if (!this.config.model) {
-                console.log(`[OllamaBackend][${queryId}] Still no model after reload`);
                 return callback(null, {
                     found: false,
                     message: 'Ollama 模型名称未配置。请在配置页中选择或输入模型名称。'
                 });
             }
 
-            // 处理目标语言占位符
-            let targetLangText = '目标语言';
-            if (targetLang === 'zh') targetLangText = '中文';
-            else if (targetLang === 'en') targetLangText = '英文';
+            // 构造稳健的翻译 Prompt (对齐进阶界面逻辑，防止输入被当成指令)
+            const fullPrompt = this.promptManager.getPrompt('advanced', {
+                text: text,
+                targetLangCode: targetLang
+            });
 
-            const systemPrompt = this.config.prompt.replace(/\$\{target_lang\}/g, targetLangText);
+            try {
+                const data = await this.fetchChat({
+                    messages: [
+                        { role: 'user', content: fullPrompt }
+                    ],
+                    temperature: this.config.temperature
+                });
 
-            const payload = {
-                model: this.config.model,
-                temperature: this.config.temperature,
-                stream: false,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: text }
-                ]
-            };
+                if (this.workerStopping) {
+                    this.workerStopping = false;
+                    return;
+                }
 
-            const fetchOptions = {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${this.config.apiKey}`
-                },
-                body: JSON.stringify(payload)
-            };
-
-            // 支持请求中断
-            if (typeof AbortController !== 'undefined') {
-                this.currentAbortController = new AbortController();
-                fetchOptions.signal = this.currentAbortController.signal;
-            }
-
-            let apiBase = (this.config.apiBase || '').trim().replace(/\/+$/, '');
-            if (apiBase && !apiBase.endsWith('/v1')) {
-                apiBase += '/v1';
-            }
-            const endpoint = `${apiBase}/chat/completions`;
-
-            // 根据 useProxy 决定请求方式：true 则使用全局，false 则强制直连
-            const requestPromise = this.config.useProxy 
-                ? fetch(endpoint, fetchOptions)
-                : this._request(endpoint, fetchOptions);
-
-            requestPromise
-                .then(res => {
-                    if (!res.ok) {
-                        throw new Error(`HTTP 异常状态码: ${res.status}`);
-                    }
-                    return res.json();
-                })
-                .then(data => {
-                    if (this.workerStopping) {
-                        this.workerStopping = false;
-                        return; // 被中断
-                    }
-
-                    if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-                        const translation = data.choices[0].message.content.trim();
-                        callback(null, {
-                            found: true,
-                            translation: translation,
-                            phonetic: '' // LLM 翻译通常不提供音标
-                        });
-                    } else {
-                        callback(null, {
-                            found: false,
-                            message: 'Ollama 接口返回格式异常，未找到翻译内容。'
-                        });
-                    }
-                })
-                .catch(err => {
-                    if (err.name === 'AbortError') {
-                        // 用户取消请求
-                        return;
-                    }
-                    
-                    let errorMsg = `API 请求失败: ${err.message}`;
-                    if (err.message.includes('fetch') || err.message.includes('Failed to fetch') || err.message.includes('ECONNREFUSED')) {
-                        errorMsg = `无法连接到 Ollama 服务 (${this.config.apiBase})，请确认 Ollama 已启动且地址正确。`;
-                    }
-                    
+                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                    const translation = data.choices[0].message.content.trim();
+                    callback(null, {
+                        found: true,
+                        translation: translation,
+                        phonetic: ''
+                    });
+                } else {
                     callback(null, {
                         found: false,
-                        message: errorMsg
+                        message: 'Ollama 接口未返回有效翻译内容。'
                     });
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                
+                let errorMsg = `API 请求失败: ${err.message}`;
+                if (err.message.includes('fetch') || err.message.includes('ECONNREFUSED')) {
+                    errorMsg = `无法连接到 Ollama 服务 (${this.config.apiBase})，请确认 Ollama 已启动。`;
+                }
+                
+                callback(null, {
+                    found: false,
+                    message: errorMsg
                 });
+            }
         }, 0);
     }
+
+    /**
+     * 底层通用对话接口 (对接 OpenAI 兼容格式)
+     * @param {Object} payload 
+     * @returns {Promise<Object>}
+     */
+    async fetchChat(payload) {
+        const model = payload.model || this.config.model;
+        const messages = payload.messages || [];
+        const temperature = payload.temperature !== undefined ? payload.temperature : this.config.temperature;
+        const stream = payload.stream || false;
+
+        const requestPayload = {
+            model,
+            messages,
+            temperature,
+            stream
+        };
+
+        const fetchOptions = {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.config.apiKey}`
+            },
+            body: JSON.stringify(requestPayload)
+        };
+
+        if (typeof AbortController !== 'undefined') {
+            this.currentAbortController = new AbortController();
+            fetchOptions.signal = this.currentAbortController.signal;
+        }
+
+        let apiBase = (this.config.apiBase || '').trim().replace(/\/+$/, '');
+        if (apiBase && !apiBase.endsWith('/v1')) {
+            apiBase += '/v1';
+        }
+        const endpoint = `${apiBase}/chat/completions`;
+
+        const res = await (this.config.useProxy ? fetch(endpoint, fetchOptions) : this._request(endpoint, fetchOptions));
+        
+        if (!res.ok) {
+            const errorObj = await res.json().catch(() => ({}));
+            throw new Error(errorObj.error?.message || `HTTP ${res.status}`);
+        }
+
+        return res.json();
+    }
+
 
     /**
      * 发起基础网络请求 (如果 options 包含强制直连逻辑则跳过系统代理)
