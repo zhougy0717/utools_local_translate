@@ -11,17 +11,8 @@ const { coreService } = require('./src/core/core_service');
 
 let lastWordToSearch = '';
 
-// 初始化配置
-const initialConfig = appConfig.load();
-
-// 构建 BackendManager 需要的配置格式
-const backendConfig = {
-  resourcePath: initialConfig.resourcePath || '',
-  proxy: appConfig.getProxy(),
-  backends: initialConfig.backends
-};
-
-BackendManager.init(backendConfig);
+// 初始化后端（静默启动）
+BackendManager.reloadFromAppConfig(true);
 coreService.init(); // 初始化核心业务服务并注入 _proxyAPI 到 window
 
 if (typeof window !== 'undefined') {
@@ -37,16 +28,15 @@ function applyEnterWithWord(word, callbackSetList) {
   const w = word.trim();
   if (!w || w.length > MAX_SELECTION_LENGTH) return false;
   if (typeof utools !== 'undefined') utools.setSubInputValue(w);
-  const sourceLang = UtoolsHelper.isLikelyChinese(w) ? 'zh' : 'en';
-  const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-  const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+  
+  const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w);
 
   callbackSetList(ViewPresenter.buildLoadingItem(BackendManager.getLoadingMessage()));
 
   // 给 UI 进程 100ms 时间用于优先在查询前渲染上面的"请稍候"列表项
   setTimeout(() => {
     const startTime = Date.now();
-    BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
+    BackendManager.queryWord(w, source, target, function (err, result) {
       const costMs = Date.now() - startTime;
       callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
     }, function (progressMsg) {
@@ -117,16 +107,14 @@ if (typeof window !== 'undefined') {
               console.log('[Preload] Rendering Loading Item:', loadingMsg);
               callbackSetList(ViewPresenter.buildLoadingItem(loadingMsg));
 
-              const sourceLang = UtoolsHelper.isLikelyChinese(w) ? 'zh' : 'en';
-              const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
-              const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+              const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w);
 
               // 步骤 3: 渲染 Loading 后的保障期。设置 300ms 延迟可有效防止后续可能产生的
               // 同步阻塞任务（如大语言模型首包生成前的计算）直接抢占 UI 渲染帧，从而确保“搜索中”状态可见。
               setTimeout(() => {
                 const startTime = Date.now();
                 console.log('[Preload] Dispatching query to backend...');
-                BackendManager.queryWord(w, sourceLang, targetLang, function (err, result) {
+                BackendManager.queryWord(w, source, target, function (err, result) {
                   const costMs = Date.now() - startTime;
                   console.log('[Preload] Result received from backend');
                   callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
@@ -156,77 +144,38 @@ if (typeof window !== 'undefined') {
           if (itemData.isCommandContext) {
             Promise.resolve(CommandManager.handleSelect(itemData, appConfig.load(), callbackSetList))
               .then(signal => {
-                console.log('[Preload] Command signal:', signal);
                 if (!signal) return;
-                console.log('[Preload] Command signal resolved:', signal);
 
-
+                // 打开配置面板
                 if (signal.openConfigPanel) {
-                  console.log('[Preload] Opening config panel via BackendManager');
-                  if (signal.reloadBackend) {
-                    appConfig.clearCache();
-                    const newConfig = appConfig.load();
-                    const backendConfig = {
-                      resourcePath: newConfig.resourcePath || '',
-                      proxy: appConfig.getProxy(),
-                      backends: newConfig.backends
-                    };
-                    BackendManager.reload(backendConfig);
-                  }
-
+                  if (signal.reloadBackend) BackendManager.reloadFromAppConfig();
+                  
                   BackendManager.openConfigPanel(() => {
-                    console.log('[Preload] Config panel closed, reloading...');
-                    try {
-                      appConfig.clearCache();
-                      const newConfig = appConfig.load();
-                      const backendConfig = {
-                        resourcePath: newConfig.resourcePath || '',
-                        proxy: appConfig.getProxy(),
-                        backends: newConfig.backends
-                      };
-                      BackendManager.reload(backendConfig);
-
-                      if (typeof utools !== 'undefined') {
-                        setTimeout(() => {
-                          utools.setSubInputValue('');
-                        }, 10);
-                      }
-                    } catch (e) {
-                      console.error('[Preload] Error in config callback:', e);
+                    BackendManager.reloadFromAppConfig();
+                    if (typeof utools !== 'undefined') {
+                      setTimeout(() => { utools.setSubInputValue(''); }, 10);
                     }
                   });
                   return;
                 }
 
+                // 自动补全
                 if (signal.autoComplete) {
-                  if (typeof utools !== 'undefined') {
-                    utools.setSubInputValue(signal.autoComplete);
-                  }
-                } else {
-                  if (signal.reloadBackend) {
-                    appConfig.clearCache();
-                    const updatedAppConfig = appConfig.load();
-                    const backendConfig = {
-                      resourcePath: updatedAppConfig.resourcePath || '',
-                      proxy: appConfig.getProxy(),
-                      backends: updatedAppConfig.backends,
-                      ollama: updatedAppConfig.ollama,
-                      libretranslate: updatedAppConfig.libretranslate
-                    };
-                    BackendManager.reload(backendConfig);
-                    console.log('[Preload][Mode] Backend reloaded for:', BackendManager.getBackendName());
-                  }
+                  if (typeof utools !== 'undefined') utools.setSubInputValue(signal.autoComplete);
+                  return;
+                }
 
-                  if (signal.restoreSearch) {
-                    const wordToRestore = lastWordToSearch || '';
-                    console.log('[Preload] Mode switch complete, restoring search word:', wordToRestore);
-                    if (wordToRestore) {
-                      // 仅仅设置输入框内容，并交给 uTools 的 search 回调处理，避免双重触发
-                      requestAnimationFrame(() => {
-                        utools.setSubInputValue(wordToRestore);
-                      });
-                    }
-                  }
+                // 仅重载后端并恢复搜索
+                if (signal.reloadBackend) {
+                  BackendManager.reloadFromAppConfig();
+                  console.log('[Preload][Mode] Backend reloaded for:', BackendManager.getBackendName());
+                }
+
+                if (signal.restoreSearch && lastWordToSearch) {
+                  console.log('[Preload] Mode switch complete, restoring search word:', lastWordToSearch);
+                  requestAnimationFrame(() => {
+                    utools.setSubInputValue(lastWordToSearch);
+                  });
                 }
               })
               .catch(err => {

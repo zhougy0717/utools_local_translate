@@ -18,7 +18,20 @@ function isLikelyChinese(text) {
   return /[\u4e00-\u9fff]/.test(String(text).trim());
 }
 
+/**
+ * 根据内容自动判定源语言和目标语言
+ * @param {string} text - 待判定文本
+ * @returns {{source: string, target: string, isZhToEn: boolean}}
+ */
+function detectLanguages(text) {
+  const isZh = isLikelyChinese(text);
+  const source = isZh ? 'zh' : 'en';
+  const target = isZh ? 'en' : 'zh';
+  return { source, target, isZhToEn: isZh };
+}
+
 module.exports = {
   readClipboardText,
-  isLikelyChinese
+  isLikelyChinese,
+  detectLanguages
 };

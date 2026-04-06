@@ -119,6 +119,25 @@ class BackendManager {
   }
 
   /**
+   * 从最新的 appConfig 自动加载并重载后端环境
+   * @param {boolean} skipUiCleanup - 是否跳过销毁当前 UI
+   */
+  reloadFromAppConfig(skipUiCleanup = false) {
+    console.log('[BackendManager] Reloading from appConfig...');
+    appConfig.clearCache();
+    const fullConfig = appConfig.load();
+    
+    // 构造满足后端初始化所需的完整配置对象
+    const backendInitConfig = {
+      ...fullConfig,
+      resourcePath: fullConfig.resourcePath || '',
+      proxy: appConfig.getProxy()
+    };
+    
+    this.reload(backendInitConfig, skipUiCleanup);
+  }
+
+  /**
    * 停止并清理当前所有的环境和后台逻辑
    */
   stop() {
