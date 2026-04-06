@@ -29,6 +29,9 @@ if (typeof window !== 'undefined') {
 }
 
 const MAX_SELECTION_LENGTH = 5000;
+const SEARCH_DEBOUNCE_MS = 300;      // 搜索防抖延迟，避免由于快速键入导致的频繁后端负载
+const UI_LIST_CLEAR_DELAY = 100;     // 强制列表清空后的 UI 响应间隔，确保渲染器能够捕捉到列表被重置的状态
+const UI_LOADING_RENDER_DELAY = 300;  // 渲染 Loading 提示后的预留延迟。关键在于给 UI 线程足够的时间在后端耗时查询（如 Ollama）开始前成功绘制“搜索中”提示。
 
 function applyEnterWithWord(word, callbackSetList) {
   const w = word.trim();
@@ -55,7 +58,6 @@ function applyEnterWithWord(word, callbackSetList) {
 }
 
 let searchTimeout = null;
-const DEBOUNCE_DELAY = 300;
 
 if (typeof window !== 'undefined') {
   window.exports = {
@@ -109,7 +111,7 @@ if (typeof window !== 'undefined') {
             // 步骤 1: 强制清空当前列表，打破 UI 引擎的批量合并
             callbackSetList([]);
 
-            // 步骤 2: 在下一帧/微任务中渲染加载项，确保 UI 线程已捕捉到变更
+            // 步骤 2: 在 UI 线程确认清空后再渲染加载项，确保变更能被平滑捕捉
             setTimeout(() => {
               const loadingMsg = BackendManager.getLoadingMessage();
               console.log('[Preload] Rendering Loading Item:', loadingMsg);
@@ -119,7 +121,8 @@ if (typeof window !== 'undefined') {
               const targetLang = sourceLang === 'zh' ? 'en' : 'zh';
               const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
 
-              // 步骤 3: 进一步延长重绘保障期，给 UI 进程预留 150ms-200ms 的纯净渲染时间
+              // 步骤 3: 渲染 Loading 后的保障期。设置 300ms 延迟可有效防止后续可能产生的
+              // 同步阻塞任务（如大语言模型首包生成前的计算）直接抢占 UI 渲染帧，从而确保“搜索中”状态可见。
               setTimeout(() => {
                 const startTime = Date.now();
                 console.log('[Preload] Dispatching query to backend...');
@@ -130,9 +133,9 @@ if (typeof window !== 'undefined') {
                 }, function (progressMsg) {
                   callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
                 });
-              }, 180);
-            }, 500);
-          }, 300);
+              }, UI_LOADING_RENDER_DELAY);
+            }, UI_LIST_CLEAR_DELAY);
+          }, SEARCH_DEBOUNCE_MS);
         },
         select: function (action, itemData, callbackSetList) {
           console.log('[Preload] Select item:', itemData);
