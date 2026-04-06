@@ -1,0 +1,47 @@
+<h2>Proxy Settings Enhancement</h2>
+<p class="subtitle">Streamlining the interface for a more compact and focused experience</p>
+
+<div class="options">
+  <div class="option" data-choice="inline-checkmark" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Inline Row with Checkmark (Recommended)</h3>
+      <p>Type, Host, Port on one line with a save "✓" button. This maximizes vertical space and provides an "instant save" feel.</p>
+      <div class="mockup" style="margin-top: 10px; background: white; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
+              <div style="width: 80px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 0.8rem;">HTTP</div>
+              <div style="flex: 1; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">127.0.0.1</div>
+              <div style="width: 60px; padding: 8px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc; font-size: 0.8rem; color: #64748b;">1080</div>
+              <div style="width: 32px; height: 32px; background: #3b82f6; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-weight: bold; cursor: pointer;">✓</div>
+          </div>
+          <div style="font-size: 0.75rem; color: #64748b; margin-top: 4px;">Auth and Test sections would follow below.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="vertical-minimal" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Vertical Minimal</h3>
+      <p>Standard vertical layout but with the checkmark as the only primary action, placed either at the top or next to the address.</p>
+    </div>
+  </div>
+</div>
+
+<div class="pros-cons">
+  <div class="pros">
+    <h4>Pros (Approach A)</h4>
+    <ul>
+      <li>Extremely space-efficient for uTools</li>
+      <li>"One-click" save workflow</li>
+      <li>Reduces visual clutter by removing redundant buttons</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>Cons (Approach A)</h4>
+    <ul>
+      <li>Dense UI on the main row</li>
+      <li>Requires clear visual cues that the checkmark is for saving</li>
+    </ul>
+  </div>
+</div>

@@ -1,0 +1,128 @@
+<style>
+  .mockup-container { background: #0f172a; padding: 20px; border-radius: 12px; margin-top: 20px; border: 1px solid #1e293b; color: #f8fafc; font-family: 'Inter', system-ui, sans-serif; height: 500px; overflow: hidden; position: relative; }
+  .tab-header { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #334155; padding-bottom: 10px; }
+  .tab-item { padding: 8px 16px; cursor: pointer; border-radius: 6px; color: #94a3b8; transition: all 0.2s; border: 1px solid transparent; }
+  .tab-item.active { background: #312e81; color: #e0e7ff; border-color: #6366f1; }
+  
+  .pane { display: none; height: calc(100% - 70px); }
+  .pane.active { display: block; }
+  
+  /* Pane A: Tabbed */
+  .layout-a { display: grid; grid-template-columns: 180px 1fr; gap: 20px; height: 100%; }
+  .sidebar { background: #1e293b; border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .side-btn { padding: 10px; border-radius: 6px; background: #334155; cursor: pointer; font-size: 14px; text-align: center; }
+  .side-btn.active { background: #6366f1; }
+  .main-content { background: #1e293b; border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 15px; overflow-y: auto; }
+  
+  /* Pane B: Cards */
+  .layout-b { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; height: 100%; overflow-y: auto; }
+  .card { background: #1e293b; border-radius: 10px; padding: 15px; border: 1px solid #334155; display: flex; flex-direction: column; gap: 10px; }
+  .card h4 { margin: 0; color: #818cf8; font-size: 14px; text-transform: uppercase; letter-spacing: 0.1em; }
+  .card p { font-size: 13px; line-height: 1.6; color: #cbd5e1; }
+  
+  /* Pane C: Minimalist */
+  .layout-c { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; text-align: center; padding: 0 40px; }
+  .min-result { font-size: 20px; line-height: 1.5; font-weight: 300; border-bottom: 2px solid #6366f1; padding-bottom: 20px; margin-bottom: 20px; width: 100%; }
+  
+  .status-bar { position: absolute; bottom: 0; left: 0; right: 0; background: #1e293b; height: 30px; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; font-size: 11px; color: #64748b; border-top: 1px solid #334155; }
+</style>
+
+<h2>Ollama 进阶翻译中心原型对比</h2>
+<p class="subtitle">点击下方选项卡实时预览不同的功能分区设计</p>
+
+<div class="mockup-container">
+  <div class="tab-header">
+    <div class="tab-item active" onclick="switchMockup(1, this)">方案 A: 分栏布局 (办公向)</div>
+    <div class="tab-item" onclick="switchMockup(2, this)">方案 B: 卡片对比 (效率向)</div>
+    <div class="tab-item" onclick="switchMockup(3, this)">方案 C: 沉浸式 (极简向)</div>
+  </div>
+
+  <!-- A: Classic Tabbed -->
+  <div id="p1" class="pane active">
+    <div class="layout-a">
+      <div class="sidebar">
+        <div class="side-btn active">🌐 深度翻译</div>
+        <div class="side-btn">✍️ 多风格润色</div>
+        <div class="side-btn">🤔 语法剖析</div>
+        <div class="side-btn">📚 场景用例</div>
+      </div>
+      <div class="main-content">
+        <div style="font-size: 12px; color: #94a3b8">检测到输入: "Persistence is the anchor that holds us steady."</div>
+        <div style="padding: 15px; background: #0f172a; border-radius: 6px; font-size: 15px; border-left: 4px solid #6366f1">
+          坚持是让我们在变迁的暴风雨中保持稳定的锚。
+        </div>
+        <div style="height: 100px; border-top: 1px solid #334155; padding-top: 10px">
+           <h5 style="margin: 0 0 10px 0; font-size: 13px">核心词分析 (Persistence):</h5>
+           <ul style="font-size: 12px; color: #94a3b8; margin: 0; padding-left: 20px">
+             <li>名：持久，坚持，不懈。</li>
+             <li>用法：Success depends on persistence. (成功取决于坚持。)</li>
+           </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- B: Card Based -->
+  <div id="p2" class="pane">
+    <div class="layout-b">
+      <div class="card">
+        <h4>Professional 💼</h4>
+        <p>坚韧不拔是我们在面对各种不确定性挑战时，确保稳定前行的核心支柱。</p>
+        <button style="margin-top:auto; background: #6366f1; color: white; border: none; border-radius: 4px; padding: 4px; font-size: 11px">复制结果</button>
+      </div>
+      <div class="card" style="border-color: #6366f1; box-shadow: 0 0 10px rgba(99,102,241,0.2)">
+        <h4>Literary 🖋️</h4>
+        <p>百折不回，恰似定风之舵，使我辈于世事浮沉中，屹然而立，不为波涛所动。</p>
+        <button style="margin-top:auto; background: #6366f1; color: white; border: none; border-radius: 4px; padding: 4px; font-size: 11px">复制结果</button>
+      </div>
+      <div class="card">
+        <h4>Colloquial 💬</h4>
+        <p>只要能稳住心态、坚持到底，再大的风浪也能扛过去。</p>
+        <button style="margin-top:auto; background: #6366f1; color: white; border: none; border-radius: 4px; padding: 4px; font-size: 11px">复制结果</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- C: Minimalist -->
+  <div id="p3" class="pane">
+    <div class="layout-c">
+      <div class="min-result">
+        坚持是我们的定海神针。
+      </div>
+      <p style="color: #64748b; font-size: 14px">
+        The anchor that holds us steady.
+      </p>
+      <div style="margin-top: 20px; display: flex; gap: 10px">
+        <span style="padding: 4px 12px; background: #334155; border-radius: 20px; font-size: 12px">润色</span>
+        <span style="padding: 4px 12px; background: #334155; border-radius: 20px; font-size: 12px">解释</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Common Status Bar -->
+  <div class="status-bar">
+    <div>🟢 Ollama 已连接 (llama3:8b)</div>
+    <div>Token 消耗: 128 (Request) / 340 (Complete)</div>
+  </div>
+</div>
+
+<script>
+  function switchMockup(id, el) {
+    // UI toggle
+    document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+    
+    document.getElementById('p' + id).classList.add('active');
+    el.classList.add('active');
+    
+    // Track selection
+    if (typeof toggleSelect === 'function') {
+      const choices = ['tabbed', 'card', 'minimal'];
+      // Use a hidden element to simulate multi-choice if needed, 
+      // but here we just use for interaction data
+      const mockEl = document.createElement('div');
+      mockEl.setAttribute('data-choice', choices[id-1]);
+      toggleSelect(mockEl);
+    }
+  }
+</script>

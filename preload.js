@@ -126,6 +126,14 @@ if (typeof window !== 'undefined') {
         },
         select: function (action, itemData, callbackSetList) {
           console.log('[Preload] Select item:', itemData);
+
+          // 如果用户点击的是进阶翻译项
+          if (itemData.isAdvancedOllama) {
+            console.log('[Preload] Entering advanced translation center');
+            BackendManager.openAdvancedPanel(itemData.searchWord, itemData.targetLangCode);
+            return;
+          }
+
           // 如果用户点击的是耗时统计条目，不进行任何动作
           if (itemData.title && itemData.title.startsWith('⚡ 本地翻译耗时')) {
             console.log('[Preload] Ignored cost item click');

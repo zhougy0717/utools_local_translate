@@ -1,6 +1,7 @@
 const { createDictBackend } = require('../backends/dict/index.js');
 const { createOllamaBackend } = require('../backends/ollama/index.js');
 const { createLibreTranslateBackend } = require('../backends/libretranslate/index.js');
+const { AdvancedPanelService } = require('../backends/ollama/advanced-service');
 const { appConfig } = require('../utils/app_config');
 const { coreService } = require('./core_service');
 
@@ -9,6 +10,8 @@ class BackendManager {
     this.activeBackend = null;
     this.currentConfig = null;
     this._proxyListenerAdded = false;
+    this.advancedPanelService = new AdvancedPanelService();
+    this._dedicatedOllamaBackend = null;
   }
 
   /**
@@ -138,31 +141,64 @@ class BackendManager {
   }
 
   /**
+   * 打开 Ollama 进阶翻译面板
+   * @param {string} text - 待处理的原始文本
+   * @param {string} targetLangCode - 目标语言代码 ('en', 'zh' 等)
+   */
+  openAdvancedPanel(text, targetLangCode) {
+    // 方案：如果当前 activeBackend 就是 Ollama，直接复用；否则从配置中创建一个专用实例。
+    let targetBackend = null;
+    if (this.activeBackend && this.activeBackend.constructor.name === 'OllamaBackend') {
+      targetBackend = this.activeBackend;
+    } else {
+      if (!this._dedicatedOllamaBackend) {
+        this._dedicatedOllamaBackend = createOllamaBackend(this.currentConfig.ollama);
+      }
+      targetBackend = this._dedicatedOllamaBackend;
+    }
+
+    this.advancedPanelService.openPanel(text, () => {
+      // 面板关闭时的处理（如需要刷新主列表）
+    }, targetBackend, targetLangCode);
+  }
+
+  /**
    * 关闭当前加载的设置面板（如果有）
    * @param {boolean} isSilent 是否静默关闭（例如在搜索触发时，不需要重置高度或归还焦点）
    */
   closeCurrentConfigPanel(isSilent = false) {
-    // 1. 关闭后端相关的配置面板
+    // 1. 关闭进阶翻译面板
+    if (this.advancedPanelService) {
+      this.advancedPanelService.closePanel(isSilent);
+    }
+
+    // 2. 关闭后端相关的配置面板
     if (this.activeBackend && typeof this.activeBackend.closePanel === 'function') {
       this.activeBackend.closePanel(isSilent);
     }
     
-    // 2. 强力清理
-    const containerIds = ['ollama-config-container', 'dict-config-container', 'proxy-config-container'];
+    // 3. 强力清理
+    const containerIds = [
+      'ollama-config-container', 
+      'dict-config-container', 
+      'proxy-config-container',
+      'ollama-advanced-panel-container'
+    ];
     containerIds.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.remove();
     });
 
-    // 3. 清理全局 API 钩子
+    // 4. 清理全局 API 钩子
     delete window._ollamaAPI;
     delete window._dictAPI;
+    delete window._advancedAPI;
     
-    // 4. 清理旧式钩子
+    // 5. 清理旧式钩子
     if (typeof window.hideOllamaConfig === 'function') window.hideOllamaConfig();
     if (typeof window.hideProxyConfig === 'function') window.hideProxyConfig();
 
-    // 5. 这里的 _closeConfigPanel 由外部注入
+    // 6. 这里的 _closeConfigPanel 由外部注入
     if (typeof window._closeConfigPanel === 'function') {
         const temp = window._closeConfigPanel;
         delete window._closeConfigPanel;
@@ -173,6 +209,9 @@ class BackendManager {
   _stopCurrentWorker() {
     if (this.activeBackend && typeof this.activeBackend.stopWorker === 'function') {
       this.activeBackend.stopWorker();
+    }
+    if (this._dedicatedOllamaBackend) {
+      this._dedicatedOllamaBackend.stopWorker();
     }
   }
 }

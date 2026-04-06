@@ -59,6 +59,16 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
     }
   }
 
+  // 追加 Ollama 进阶入口
+  const targetLangCode = isZhToEn ? 'en' : 'zh';
+  list.push({
+    title: '✨ 使用 Ollama 进阶翻译...',
+    description: '基于 AI 提供深度润色、语法剖析与多风格翻译',
+    isAdvancedOllama: true,
+    searchWord: searchWord,
+    targetLangCode: targetLangCode
+  });
+
   // 独立追加时延统计项
   if (costTime && showCostConfig) {
     const costSeconds = (costTime / 1000).toFixed(2);
