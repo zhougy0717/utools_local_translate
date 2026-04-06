@@ -4,6 +4,7 @@
  */
 
 const Bridge = window.parent._advancedAPI;
+let currentTask = 'advanced';
 
 const UI = {
   btnExecute: document.getElementById('btn-execute'),
@@ -12,10 +13,68 @@ const UI = {
   promptInput: document.getElementById('prompt-input'),
   resultText: document.getElementById('result-text'),
   langSelect: document.getElementById('lang-select'),
+  langSelectGroup: document.getElementById('lang-select-group'),
   modelSelect: document.getElementById('model-select'),
   connectionStatus: document.getElementById('connection-status'),
-  tokenUsage: document.getElementById('token-usage')
+  tokenUsage: document.getElementById('token-usage'),
+  // 核心新增：侧边栏与多风格结果视图容器
+  sidebar: document.getElementById('sidebar'),
+  resultLabel: document.getElementById('result-label'),
+  namingResults: document.getElementById('naming-results'),
+  namingSuggestions: document.getElementById('naming-suggestions'),
+  // 命名输入框引用
+  namingInputs: {
+    pascal: document.getElementById('naming-pascal'),
+    camel: document.getElementById('naming-camel'),
+    snake: document.getElementById('naming-snake'),
+    constant: document.getElementById('naming-constant'),
+    kebab: document.getElementById('naming-kebab')
+  }
 };
+
+/**
+ * 任务切换逻辑
+ */
+function switchTask(task) {
+  if (currentTask === task) return;
+  currentTask = task;
+  
+  // 更新导航项激活状态
+  const items = UI.sidebar.querySelectorAll('.nav-item');
+  items.forEach(item => {
+    if (item.dataset.task === task) item.classList.add('active');
+    else item.classList.remove('active');
+  });
+
+  // 根据任务类型切换 UI 显隐
+  if (task === 'naming') {
+    UI.resultLabel.textContent = '变量命名';
+    UI.resultText.style.display = 'none';
+    UI.namingResults.style.display = 'flex';
+    // 切换任务时重置命名结果
+    Object.values(UI.namingInputs).forEach(input => { input.value = ''; });
+    // 命名时目标语言默认英文且隐藏语言选择器
+    UI.langSelect.value = 'en';
+    UI.langSelectGroup.style.display = 'none';
+    UI.btnExecute.textContent = '执行命名';
+  } else {
+    UI.resultLabel.textContent = '翻译结果';
+    UI.resultText.style.display = 'block';
+    UI.namingResults.style.display = 'none';
+    UI.langSelectGroup.style.display = 'inline';
+    UI.btnExecute.textContent = '执行翻译';
+  }
+
+  // 立即根据当前原文更新提示词
+  refreshPrompt();
+}
+
+/**
+ * 更新提示词
+ */
+function refreshPrompt() {
+  UI.promptInput.value = Bridge.getInitialPrompt(UI.sourceInput.value, UI.langSelect.value, currentTask);
+}
 
 /**
  * 更新状态栏
@@ -50,9 +109,60 @@ function populateModels(models, currentModel = '') {
 }
 
 /**
- * 执行翻译
+ * 渲染命名结果 (处理多建议词标签)
  */
-async function handleTranslate() {
+function renderNamingResults(rawText) {
+  // 按照约定使用 | 分隔建议词
+  const suggestions = rawText.split('|')
+    .map(s => s.trim())
+    .filter(s => s && s.length > 0)
+    .slice(0, 5); // 最多取 5 个
+
+  UI.namingSuggestions.innerHTML = '';
+  
+  if (suggestions.length > 0) {
+    UI.namingSuggestions.style.display = 'flex';
+    suggestions.forEach((phrase, index) => {
+      const tag = document.createElement('div');
+      tag.className = 'suggestion-tag';
+      if (index === 0) tag.classList.add('active');
+      tag.textContent = phrase;
+      
+      tag.onclick = () => {
+        // 切换激活状态
+        UI.namingSuggestions.querySelectorAll('.suggestion-tag').forEach(t => t.classList.remove('active'));
+        tag.classList.add('active');
+        // 刷新下方各风格结果
+        applyStyles(phrase);
+      };
+      
+      UI.namingSuggestions.appendChild(tag);
+    });
+    
+    // 默认执行第一个建议词的格式化
+    applyStyles(suggestions[0]);
+  } else {
+    UI.namingSuggestions.style.display = 'none';
+    applyStyles(rawText);
+  }
+}
+
+/**
+ * 将短语应用到各种命名风格
+ */
+function applyStyles(phrase) {
+  const styles = Bridge.formatNaming(phrase);
+  UI.namingInputs.pascal.value = styles.pascal || '';
+  UI.namingInputs.camel.value = styles.camel || '';
+  UI.namingInputs.snake.value = styles.snake || '';
+  UI.namingInputs.constant.value = styles.constant || '';
+  UI.namingInputs.kebab.value = styles.kebab || '';
+}
+
+/**
+ * 执行翻译/命名
+ */
+async function handleTask() {
   const text = UI.sourceInput.value.trim();
   const prompt = UI.promptInput.value.trim();
   const model = UI.modelSelect.value;
@@ -61,8 +171,17 @@ async function handleTranslate() {
   if (!text || !prompt) return;
 
   UI.btnExecute.disabled = true;
-  UI.btnExecute.textContent = '翻译中...';
-  UI.resultText.textContent = 'AI 正在思考中...';
+  const originalBtnText = UI.btnExecute.textContent;
+  UI.btnExecute.textContent = currentTask === 'naming' ? '命名中...' : '翻译中...';
+  
+  if (currentTask !== 'naming') {
+    UI.resultText.textContent = 'AI 正在思考中...';
+  } else {
+    // 命名模式下，清空现有结果和建议词
+    UI.namingSuggestions.innerHTML = '';
+    UI.namingSuggestions.style.display = 'none';
+    Object.values(UI.namingInputs).forEach(input => { input.value = ''; });
+  }
 
   try {
     const result = await Bridge.translate({
@@ -73,18 +192,29 @@ async function handleTranslate() {
     });
 
     if (result.success) {
-      UI.resultText.textContent = result.translation;
-      updateStatus(true, '翻译完成', result.usage || 0);
+      if (currentTask === 'naming') {
+        renderNamingResults(result.translation);
+      } else {
+        UI.resultText.textContent = result.translation;
+      }
+      updateStatus(true, currentTask === 'naming' ? '命名生成成功' : '翻译完成', result.usage || 0);
     } else {
-      UI.resultText.textContent = `❌ 发生错误: ${result.error}`;
+      const errorMsg = `❌ 发生错误: ${result.error}`;
+      if (currentTask === 'naming') {
+        UI.namingInputs.pascal.value = errorMsg;
+      } else {
+        UI.resultText.textContent = errorMsg;
+      }
       updateStatus(true, '请求失败');
     }
   } catch (e) {
-    UI.resultText.textContent = `❌ 网络或接口异常: ${e.message}`;
+    const errorMsg = `❌ 网络或接口异常: ${e.message}`;
+    if (currentTask === 'naming') UI.namingInputs.pascal.value = errorMsg;
+    else UI.resultText.textContent = errorMsg;
     updateStatus(false, '连接异常');
   } finally {
     UI.btnExecute.disabled = false;
-    UI.btnExecute.textContent = '执行翻译';
+    UI.btnExecute.textContent = originalBtnText;
   }
 }
 
@@ -93,7 +223,7 @@ async function handleTranslate() {
  */
 async function init() {
   if (!Bridge) {
-    UI.resultText.textContent = '错误：Bridge API 未发现。请在普通模式下打开此面板。';
+    UI.resultText.textContent = '错误：Bridge API 未发现。请从 uTools 内部启动进阶翻译中心。';
     return;
   }
 
@@ -109,24 +239,43 @@ async function init() {
   populateModels(config.models || [], config.currentModel);
   
   // 初始化提示词
-  UI.promptInput.value = Bridge.getInitialPrompt(UI.sourceInput.value, UI.langSelect.value);
+  refreshPrompt();
 
   // 按钮事件
-  UI.btnExecute.addEventListener('click', handleTranslate);
+  UI.btnExecute.addEventListener('click', handleTask);
   UI.btnConfig.addEventListener('click', () => Bridge.openOllamaConfig());
+
+  // 侧边栏任务切换事件
+  UI.sidebar.addEventListener('click', (e) => {
+    const item = e.target.closest('.nav-item');
+    if (item && item.dataset.task) {
+      switchTask(item.dataset.task);
+    }
+  });
+
+  // 绑定预设的复制按钮事件
+  ['pascal', 'camel', 'snake', 'constant', 'kebab'].forEach(key => {
+    const btn = document.getElementById(`copy-${key}`);
+    if (btn) {
+      btn.onclick = () => {
+        const val = UI.namingInputs[key].value;
+        if (val) Bridge.copyText(val);
+      };
+    }
+  });
 
   // 语言切换时自动更新提示词
   UI.langSelect.addEventListener('change', () => {
-    UI.promptInput.value = Bridge.getInitialPrompt(UI.sourceInput.value, UI.langSelect.value);
+    refreshPrompt();
   });
 
   // 实况状态检查
   const check = await Bridge.checkStatus();
   updateStatus(check.online, check.message);
   
-  // 自动触发首次翻译
+  // 自动触发首次执行 (如果初始内容不为空)
   if (UI.sourceInput.value.trim()) {
-    handleTranslate();
+    handleTask();
   }
 }
 

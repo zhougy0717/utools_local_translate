@@ -77,6 +77,44 @@
       min-height: 120px; background: #f8fafc; border-style: dashed; overflow-wrap: break-word; white-space: pre-wrap;
     }
 
+    /* 变量命名风格列表样式 */
+    .naming-results-wrapper { display: none; flex-direction: column; gap: 10px; padding: 4px 0; }
+    .naming-row { display: flex; align-items: flex-start; gap: 10px; }
+    .naming-label { 
+      width: 90px; flex-shrink: 0; display: flex; flex-direction: column; 
+      line-height: 1.25; padding-top: 4px;
+    }
+    .naming-label-zh { font-size: 12px; color: var(--text-main); font-weight: 600; }
+    .naming-label-en { font-size: 10px; color: var(--text-muted); font-family: sans-serif; font-weight: normal; }
+    .naming-input-group { flex: 1; display: flex; align-items: center; gap: 6px; }
+    .naming-value { 
+      flex: 1; background: white; border: 1px solid var(--border-color); border-radius: 4px; 
+      padding: 6px 10px; font-size: 13px; color: var(--text-main); font-family: monospace;
+      outline: none; transition: border-color 0.2s;
+    }
+    .naming-value:focus { border-color: var(--accent-color); }
+    .btn-copy {
+      padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 4px;
+      background: white; color: var(--text-muted); font-size: 11px; cursor: pointer;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-copy:hover { border-color: var(--accent-color); color: var(--accent-color); background: #f0f7ff; }
+    
+    /* 变量命名候选建议标签样式 */
+    .naming-suggestions-wrapper { 
+      display: none; height: 32px; align-items: center; gap: 8px; 
+      overflow-x: auto; padding: 2px 0 6px 0; margin-bottom: 6px;
+      scrollbar-width: none; /* Firefox */
+    }
+    .naming-suggestions-wrapper::-webkit-scrollbar { display: none; }
+    .suggestion-tag {
+      padding: 4px 10px; border: 1px solid var(--border-color); border-radius: 14px;
+      background: white; color: var(--text-muted); font-size: 12px; cursor: pointer;
+      white-space: nowrap; transition: all 0.2s;
+    }
+    .suggestion-tag:hover { border-color: var(--accent-color); color: var(--accent-color); }
+    .suggestion-tag.active { background: var(--accent-color); color: white; border-color: var(--accent-color); box-shadow: 0 2px 4px rgba(37,99,235,0.2); }
+
     .footer-status { 
       height: 28px; padding: 0 15px; background: var(--header-bg); font-size: 11px; color: #64748b; 
       display: flex; align-items: center; justify-content: space-between; border-top: 1px solid var(--border-color); 
@@ -91,33 +129,96 @@
 </head>
 <body>
 <div class="advanced-container">
-  <header class="toolbar">
-    <div class="brand">Ollama 进阶翻译中心</div>
-    <div class="controls">
-      <span class="control-label">目标语言:</span>
-      <select id="lang-select">
-        <option value="auto">自动检测</option>
-        <option value="zh">简体中文</option>
-        <option value="en">English</option>
-        <option value="ja">日本語</option>
-      </select>
-      <span class="control-label">使用模型:</span>
-      <select id="model-select">
-        <option value="">正在获取模型...</option>
-      </select>
-      <button class="btn-execute" id="btn-execute">执行翻译</button>
-      <span class="btn-config" id="btn-config" title="配置 Ollama">⚙️</span>
-    </div>
-  </header>
+    <header class="toolbar">
+      <div class="brand">Ollama 进阶翻译中心</div>
+      <div class="controls">
+        <span id="lang-select-group">
+          <span class="control-label">目标语言:</span>
+          <select id="lang-select">
+            <option value="auto">自动检测</option>
+            <option value="zh">简体中文</option>
+            <option value="en">English</option>
+            <option value="ja">日本語</option>
+          </select>
+        </span>
+        <span class="control-label">使用模型:</span>
+        <select id="model-select">
+          <option value="">正在获取模型...</option>
+        </select>
+        <button class="btn-execute" id="btn-execute">执行翻译</button>
+        <span class="btn-config" id="btn-config" title="配置 Ollama">⚙️</span>
+      </div>
+    </header>
 
   <div class="content-wrapper">
-    <aside class="sidebar">
-      <div class="nav-item active">进阶翻译</div>
+    <aside class="sidebar" id="sidebar">
+      <div class="nav-item active" data-task="advanced">进阶翻译</div>
+      <div class="nav-item" data-task="naming">变量命名</div>
     </aside>
 
     <main class="editor-main">
       <section class="pane result-pane">
-        <label>翻译结果</label>
+        <label id="result-label">翻译结果</label>
+        
+        <!-- 变量命名特有的多风格展示区 -->
+        <div class="naming-results-wrapper" id="naming-results">
+          <!-- 建议词标签区 -->
+          <div class="naming-suggestions-wrapper" id="naming-suggestions">
+            <!-- 动态注入标签 -->
+          </div>
+          
+          <div class="naming-row">
+            <div class="naming-label">
+                <span class="naming-label-zh">大驼峰</span>
+                <span class="naming-label-en">PascalCase</span>
+            </div>
+            <div class="naming-input-group">
+              <input type="text" class="naming-value" id="naming-pascal" readonly placeholder="等待生成..." onclick="this.select()">
+              <button class="btn-copy" id="copy-pascal">复制</button>
+            </div>
+          </div>
+          <div class="naming-row">
+            <div class="naming-label">
+                <span class="naming-label-zh">小驼峰</span>
+                <span class="naming-label-en">camelCase</span>
+            </div>
+            <div class="naming-input-group">
+              <input type="text" class="naming-value" id="naming-camel" readonly placeholder="等待生成..." onclick="this.select()">
+              <button class="btn-copy" id="copy-camel">复制</button>
+            </div>
+          </div>
+          <div class="naming-row">
+            <div class="naming-label">
+                <span class="naming-label-zh">下划线</span>
+                <span class="naming-label-en">snake_case</span>
+            </div>
+            <div class="naming-input-group">
+              <input type="text" class="naming-value" id="naming-snake" readonly placeholder="等待生成..." onclick="this.select()">
+              <button class="btn-copy" id="copy-snake">复制</button>
+            </div>
+          </div>
+          <div class="naming-row">
+            <div class="naming-label">
+                <span class="naming-label-zh">常量名</span>
+                <span class="naming-label-en">CONSTANT_CASE</span>
+            </div>
+            <div class="naming-input-group">
+              <input type="text" class="naming-value" id="naming-constant" readonly placeholder="等待生成..." onclick="this.select()">
+              <button class="btn-copy" id="copy-constant">复制</button>
+            </div>
+          </div>
+          <div class="naming-row">
+            <div class="naming-label">
+                <span class="naming-label-zh">短横线</span>
+                <span class="naming-label-en">kebab-case</span>
+            </div>
+            <div class="naming-input-group">
+              <input type="text" class="naming-value" id="naming-kebab" readonly placeholder="等待生成..." onclick="this.select()">
+              <button class="btn-copy" id="copy-kebab">复制</button>
+            </div>
+          </div>
+        </div>
+        
         <div class="text-display" id="result-text">等待翻译...</div>
       </section>
 
