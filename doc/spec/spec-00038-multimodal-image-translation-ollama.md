@@ -32,8 +32,24 @@
 ### 2.4 后端实现 (`src/backends/ollama/index.js`)
 1.  实现 `queryImage(imageData, callback, progressCallback)`：
     *   构造符合 OpenAI Vision API 标准的 `messages` 结构。
-    *   `content` 字段改为数组：包含一个 `text` 类型（提示词）和一个 `image_url` 类型（包含 Base64 数据）。
-2.  **Prompt 获取**：调用 `PromptManager.getPrompt('vision', { targetLang: '...' })`。
+    *   `content` 字段改为数组：包含一个 `text` 类型（提示词）和一个 `image_url` 类型（其中 `url` 包含原封不动的 DataURL）。
+2.  **具体请求负载 (Payload) 示例**：
+    ```json
+    {
+      "model": "llava", 
+      "messages": [
+        {
+          "role": "user",
+          "content": [
+            { "type": "text", "text": "[VISION_PROMPT]" },
+            { "type": "image_url", "image_url": { "url": "data:image/png;base64,..." } }
+          ]
+        }
+      ],
+      "stream": false
+    }
+    ```
+3.  **Prompt 获取**：调用 `PromptManager.getPrompt('vision', { targetLang: '...' })`。
 
 ### 2.5 提示词管理 (`src/backends/ollama/prompt-manager.js`)
 新增 `vision` 任务模板，专门用于指导多模态模型执行 OCR + 翻译任务。
@@ -47,10 +63,32 @@
 *   **Base64 负载**：高清截图的 Base64 字符串很大，需确保 IPC 和 API 请求不超时。
 *   **处理多行文本**：模型输出通常带有换行符，需在 `ViewPresenter` 中妥善转换为 uTools 列表项。
 
-## 4. 任务拆解
+## 5. 测试设计
+
+为了确保图片翻译功能的稳定性，我们将从以下几个维度进行单元测试：
+
+### 5.1 Prompt 管理测试 (`test/prompt_manager.test.js`)
+*   **用例**：验证 `getPrompt('vision', { targetLangCode: 'en' })` 是否正确加载了视觉模板。
+*   **用例**：验证 `[TARGET_LANG]` 占位符是否被替换为正确的语言名称。
+
+### 5.2 后端请求测试 (`test/ollama_backend.test.js`)
+*   **Mock 测试**：使用 `jest` 或 `sinon` 模拟网络请求，验证 `queryImage` 发送的请求负载（Payload）是否符合 OpenAI Vision 规范。
+    *   检查 `content` 数组是否包含 `text` 和 `image_url`。
+    *   检查 `image_url.url` 是否正确包含了 Base64 图片数据。
+*   **异常处理**：模拟 Ollama 返回 404 或 400（模型不支持视觉时），验证后端能否捕获错误并返回友好的提示。
+
+### 5.3 路由逻辑测试 (`test/backend_manager.test.js`)
+*   **路由验证**：在 `activeBackend` 为 `DictBackend`（不支持视觉）时调用 `queryImage`，验证是否返回了预期的错误提示。
+*   **转发验证**：在 `activeBackend` 为 `OllamaBackend` 时调用 `queryImage`，验证请求是否成功转发至后端。
+
+### 5.4 UI 渲染测试 (`test/view_presenter.test.js`)
+*   **长文本渲染**：模拟模型返回的多行提取结果，验证 `ViewPresenter` 能否将其清晰地呈现在 uTools 列表中。
+
+## 6. 任务拆解
 1.  [ ] 更新 `plugin.json` 增加 `img` 指令支持。
 2.  [ ] 修改 `PromptManager` 增加 `vision` 视觉提示词模板。
 3.  [ ] 在 `BackendManager` 中定义 `queryImage` 路由逻辑。
 4.  [ ] 实现 `OllamaBackend.queryImage` 的多模态请求封装。
 5.  [ ] 在 `preload.js` 中接入 `action.type === 'img'` 的分发逻辑。
-6.  [ ] 联调测试：验证从截图到列表显示翻译结果的完整链路。
+6.  [ ] **编写单元测试** 并确保覆盖以上场景。
+7.  [ ] 联调测试：验证从截图到列表显示翻译结果的完整链路。

@@ -59,6 +59,26 @@ if (typeof window !== 'undefined') {
           // 统一清理：确保关闭任何可能遗留的配置面板（实现零感知解耦）
           BackendManager.closeCurrentConfigPanel();
 
+          // 处理图片输入 (来自 uTools 的搜索建议或截图)
+          if (action && action.type === 'img' && action.payload) {
+            console.log('[Preload] Image translation triggered');
+            callbackSetList(ViewPresenter.buildLoadingItem('正在识别并翻译图中文字...'));
+            
+            // 使用默认查词语言逻辑确定目标语言
+            const { target } = UtoolsHelper.detectLanguages(''); // 默认目标
+
+            BackendManager.queryImage(action.payload, target, (err, result) => {
+              if (err) {
+                callbackSetList([{ title: '图片识别失败', description: err.message }]);
+                return;
+              }
+              callbackSetList(ViewPresenter.buildResultItems('图片翻译', result || { found: false }, false, 0, BackendManager.getBackendName(), false));
+            }, (progressMsg) => {
+              callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
+            });
+            return;
+          }
+
           // 从超级面板等入口带入的选中文字：type 为 over，payload 为选中文本
           const payloadText =
             action && action.type === 'over' && typeof action.payload === 'string'

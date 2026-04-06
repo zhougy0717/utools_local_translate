@@ -119,6 +119,75 @@ class OllamaBackend {
     }
 
     /**
+     * 多模态图片识别与翻译
+     * @param {string} imageData - 图片的 DataURL (Base64)
+     * @param {string} targetLang - 目标语言代码
+     * @param {function} callback - (err, result)
+     * @param {function} progressCallback - 进度更新
+     */
+    queryImage(imageData, targetLang, callback, progressCallback = null) {
+        const queryId = Math.random().toString(36).substring(7);
+        console.log(`[OllamaBackend][${queryId}] queryImage started`);
+
+        setTimeout(async () => {
+            if (typeof progressCallback === 'function') {
+                progressCallback('正在读取图片并连接 Ollama...');
+            }
+
+            if (!this.config || !this.config.model) {
+                this.reloadConfig();
+            }
+
+            const visionPrompt = this.promptManager.getPrompt('vision', { targetLangCode: targetLang });
+
+            try {
+                // 尝试剥离 DataURL 前缀，以适配部分本地模型层对纯 Base64 的敏感度
+                const pureBase64 = imageData.includes('base64,') ? imageData.split('base64,')[1] : imageData;
+
+                // 构造 OpenAI 兼容的高级多模态 Content 结构
+                const data = await this.fetchChat({
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'image_url', image_url: { url: pureBase64 } },
+                                { type: 'text', text: visionPrompt }
+                            ]
+                        }
+                    ],
+                    temperature: this.config.temperature
+                });
+
+                if (this.workerStopping) {
+                    this.workerStopping = false;
+                    return;
+                }
+
+                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                    const translation = data.choices[0].message.content.trim();
+                    callback(null, {
+                        found: true,
+                        translation: translation,
+                        phonetic: ''
+                    });
+                } else {
+                    callback(null, {
+                        found: false,
+                        message: '模型未能识别出图片中的文字或未返回结果。'
+                    });
+                }
+            } catch (err) {
+                if (err.name === 'AbortError') return;
+                console.error(`[OllamaBackend][${queryId}] Error:`, err);
+                callback(null, {
+                    found: false,
+                    message: `图片解析失败: ${err.message} (请检查模型是否支持视觉能力)`
+                });
+            }
+        }, 0);
+    }
+
+    /**
      * 底层通用对话接口 (对接 OpenAI 兼容格式)
      * @param {Object} payload 
      * @returns {Promise<Object>}

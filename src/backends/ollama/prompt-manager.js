@@ -26,17 +26,20 @@ class PromptManager {
 - **只输出**短语结果，严禁输出任何解释、序号、总结或非英文字符（除了分隔符 |）。
 
 待处理业务描述: [TEXT]
-候选名称短语 (用 | 分隔): `
+    候选名称短语 (用 | 分隔): `,
+      vision: "参考图中显示的图片内容 [img-0]，你是一位专业的 OCR 和翻译专家。请识别并提取图片中的所有文字，并将其准确且自然地翻译成 [TARGET_LANG]。\n\n注意：请只返回翻译后的结果文字，不要包含任何额外的解释、说明或 [img-0] 符号。如果图片中有多段文字，请按逻辑分行输出。\n\n目标语言：[TARGET_LANG]"
     };
   }
 
   /**
    * 基于任务类型获取并构建 Prompt
-   * @param {string} taskType - advanced | naming
+   * @param {string} taskType - advanced | naming | vision
    * @param {Object} context - { text, targetLangCode }
    */
   getPrompt(taskType, context) {
-    const template = taskType === 'naming' ? this.templates.naming : this.templates.advanced;
+    let template = this.templates.advanced;
+    if (taskType === 'naming') template = this.templates.naming;
+    else if (taskType === 'vision') template = this.templates.vision;
     
     // 语言代码转文字
     let targetLang = '中文';

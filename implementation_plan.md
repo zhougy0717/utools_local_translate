@@ -1,64 +1,66 @@
-# Implementation Plan - Ollama 进阶翻译中心
+# Implementation Plan - 基于 Ollama 多模态模型的图片翻译
 
-## 1. 目标
-在所有翻译模式中加入 Ollama 进阶翻译入口，并实现一个功能完整、可编辑的翻译工作台面板。
+该计划旨在实现 Spec-00038 中定义的图片翻译功能。通过利用 Ollama 的 `llava` 等多模态模型，用户可以通过截图快速获取翻译结果。
 
-## 2. 提议的变更
+## User Review Required
 
-### 2.1 核心服务层 (Core Services)
+> [!IMPORTANT]
+> **模型要求**：用户必须确保本地 Ollama 运行的是支持视觉的模型（如 `llava` 或 `qwen-vl`）。如果不满足，插件将返回错误提示。
+> **DataURL 长度**：高分辨率截图会导致极大的 DataURL 字符串，可能会对内存造成压力。目前计划采用原样透传，后续视性能情况考虑压缩。
 
-#### [NEW] [prompt-manager.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/prompt-manager.js)
-*   **职责**: 管理不同 AI 任务的提示词模板。
-*   **功能**:
-    *   提供默认的“进阶翻译”中文模板。
-    *   支持变量替换（`[TARGET_LANG]`, `[TEXT]`）。
+## Proposed Changes
 
-#### [NEW] [advanced-service.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/advanced-service.js)
-*   **职责**: 管理进阶面板的 Webview 生命周期，并作为 IPC 桥梁。
-*   **功能**:
-    *   `openPanel(initialText)`: 挂载 iframe，分配 `window._advancedAPI`。
-    *   `closePanel()`: 卸载容器，恢复 uTools 高度。
-    *   通过 Bridge 提供常用的 `query`、`getModels` 等接口。
+---
 
-### 2.2 界面与渲染层 (UI & Rendering)
+### [Component] 配置与指令
 
-#### [NEW] [advanced-panel.html](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/advanced-panel.html)
-*   **职责**: 进阶面板的 HTML 结构与 CSS。
-*   **设计**: 遵循 Spec 中的**白色主题**和**三段式布局**。
+#### [MODIFY] [plugin.json](file:///c:/Users/Banny/code/local_translate/plugin.json)
+- 在 `dict` 特性的 `cmds` 中增加 `{ "type": "img", "label": "图片翻译" }`。
 
-#### [NEW] [advanced-renderer.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/advanced-renderer.js)
-*   **职责**: 控制面板交互。
-*   **逻辑**:
-    *   初始加载时更新“原文”和“提示词”框。
-    *   监听“执行翻译”按钮，调用 Bridge 接口请求 Ollama。
-    *   处理渲染翻译结果（支持 Markdown）。
+---
 
-### 2.3 集成逻辑 (Integration)
+### [Component] 提示词与核心逻辑
 
-#### [MODIFY] [view_presenter.js](file:///c:/Users/Banny/code/local_translate/src/utils/view_presenter.js)
-*   在 `buildResultItems` 函数末尾，检测 Ollama 是否可用，并追加 `✨ 使用 Ollama 进阶翻译...` 项。
-*   为该项设置特殊的 `isAdvancedOllama: true` 标记。
+#### [MODIFY] [prompt-manager.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/prompt-manager.js)
+- 新增 `vision` 模板，用于指导模型进行 OCR 提取和翻译。
 
 #### [MODIFY] [backend_manager.js](file:///c:/Users/Banny/code/local_translate/src/core/backend_manager.js)
-*   新增 `openAdvancedPanel(text)` 方法，协调 `AdvancedPanelService` 的启动。
+- 新增 `queryImage(imageData, callback, progressCallback)` 方法。
+- 实现路由分发逻辑：仅在后端支持 `queryImage` 时调用，否则提示不支持。
+
+#### [MODIFY] [src/backends/ollama/index.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/index.js)
+- 实现 `queryImage` 方法。
+- 构造支持 `content` 数组的 `messages` 结构发送至 Ollama。
+
+---
+
+### [Component] 触发与入口
 
 #### [MODIFY] [preload.js](file:///c:/Users/Banny/code/local_translate/preload.js)
-*   在 `select` 回调中，识别 `isAdvancedOllama` 标记，并调用 `BackendManager.openAdvancedPanel`。
+- 在 `enter` 回调中匹配 `action.type === 'img'`。
+- 从 `action.payload` 提取图片并分发至 `BackendManager`。
+- 实现异步加载状态展示。
 
-## 3. 验证计划
+---
 
-### 3.1 自动化测试
-*   编写 `test/prompt_manager.test.js`：
-    *   测试模板变量替换是否正确。
-    *   测试空文本处理。
+### [Component] 自动化测试
 
-### 3.2 手动验证步骤
-1.  **词典模式进入**: 查询一个单词，滚动到列表底部，验证进阶入口是否存在。
-2.  **面板初始化**: 点击入口，验证面板是否正常弹出，且原文已正确填充。
-3.  **编辑与执行**: 
-    *   在面板中修改原文。
-    *   点击“执行翻译”，验证 Ollama 是否返回了针对修改后原文的翻译。
-4.  **UI 风格**: 验证面板是否为白色背景，风格是否与插件统一。
+#### [NEW] [ollama_backend.test.js](file:///c:/Users/Banny/code/local_translate/test/ollama_backend.test.js)
+- 验证 `queryImage` 生成的 Payload 是否符合 OpenAI 视觉模型标准。
+- 测试模型报错时的处理逻辑。
 
-## 4. 待解决问题
-*   **流式输出**: 目前 `OllamaBackend` 主要支持非流式，进阶面板是否需要立即支持流式（Stream）以提升体验？(建议首期保持非流式以确保稳定性，后期优化)。
+#### [NEW] [prompt_manager.test.js](file:///c:/Users/Banny/code/local_translate/test/prompt_manager.test.js)
+- 验证 `vision` 模板的加载和变量替换。
+
+## Verification Plan
+
+### Automated Tests
+- 运行 `npm test` 命令执行新编写的单元测试。
+- 使用 `jest` 模拟 Ollama API 响应。
+
+### Manual Verification
+1. 复制一张包含文字的图片到剪贴板。
+2. 打开 uTools 搜索框，选择“图片翻译”建议项。
+3. 观察列表是否显示“正在识别图片...”。
+4. 验证是否返回了正确的提取与翻译文本。
+5. 切换到不支持视觉的后端（如本地词典），验证是否提示“不支持图片识别”。

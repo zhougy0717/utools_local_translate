@@ -109,6 +109,28 @@ class BackendManager {
   }
 
   /**
+   * 委托调用底层引擎进行图片识别与翻译
+   * @param {string} imageData - 图片 DataURL/Base64
+   * @param {string} targetLang - 目标语言
+   * @param {Function} callback - 回调
+   * @param {Function} progressCallback - 进度回调
+   */
+  queryImage(imageData, targetLang, callback, progressCallback) {
+    if (!this.activeBackend) {
+      callback(new Error('Backend not initialized'), null);
+      return;
+    }
+    if (typeof this.activeBackend.queryImage !== 'function') {
+      callback(null, {
+        found: false,
+        message: `当前后端 (${this.getBackendName()}) 不支持图片识别。请在设置中切换回 Ollama 并确保选用了支持视觉的模型。`
+      });
+      return;
+    }
+    this.activeBackend.queryImage(imageData, targetLang, callback, progressCallback);
+  }
+
+  /**
    * 重载后端（通常在配置发生改变时被调用）
    * @param {Object} newConfig - 新的环境配置
    * @param {boolean} skipUiCleanup - 是否跳过 UI 清理

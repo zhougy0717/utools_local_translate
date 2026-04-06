@@ -14,11 +14,18 @@ test('PromptManager tests', async (t) => {
     assert.strictEqual(result, 'Translate "Hello" into 中文.');
   });
 
-  await t.test('getDefaultTemplate should return advanced translation prompt', () => {
+  await t.test('getPrompt should return vision prompt when taskType is vision', () => {
     const manager = new PromptManager();
-    const template = manager.getDefaultTemplate();
-    assert.ok(template.includes('[TARGET_LANG]'));
-    assert.ok(template.includes('[TEXT]'));
-    assert.ok(template.includes('翻译官'));
+    const result = manager.getPrompt('vision', { targetLangCode: 'en' });
+    assert.ok(result.includes('OCR'));
+    assert.ok(result.includes('英文'));
+    assert.ok(!result.includes('[TARGET_LANG]'));
+  });
+
+  await t.test('getPromptTemplate should return template with [TEXT] for UI use', () => {
+    const manager = new PromptManager();
+    const result = manager.getPromptTemplate('advanced', 'zh');
+    assert.ok(result.includes('[TEXT]'));
+    assert.ok(result.includes('中文'));
   });
 });
