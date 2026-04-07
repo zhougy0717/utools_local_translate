@@ -156,6 +156,7 @@
     <aside class="sidebar" id="sidebar">
       <div class="nav-item active" data-task="advanced">进阶翻译</div>
       <div class="nav-item" data-task="naming">变量命名</div>
+      <div class="nav-item" data-task="ocr">图片翻译</div>
     </aside>
 
     <main class="editor-main">
@@ -229,9 +230,17 @@
         <textarea id="source-input" placeholder="输入或精修待翻译原文..."></textarea>
       </section>
 
-      <section class="pane prompt-pane">
+      <section class="pane prompt-pane" id="prompt-pane">
         <label>提示词提示 (可编辑)</label>
         <textarea id="prompt-input" placeholder="输入翻译指令，使用 [TEXT] 指定原文注入位置..."></textarea>
+      </section>
+
+      <section class="pane" id="ocr-preview-pane" style="display: none;">
+        <label>原图参考</label>
+        <div id="ocr-image-container" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 6px; height: 200px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+          <img id="ocr-preview-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">
+          <div id="ocr-empty-hint" style="position: absolute; color: #94a3b8; font-size: 12px;">剪贴板中检测到图片将自动显示在此处</div>
+        </div>
       </section>
     </main>
   </div>

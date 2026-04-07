@@ -10,7 +10,7 @@
  * @param {boolean} [showCostConfig=true] - 全局配置开关：是否显示耗时条目
  * @returns {Array<{title: string, description: string, icon?: string}>} 供 uTools 渲染的列表项数组
  */
-function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = '词典查询时延', showCostConfig = true) {
+function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = '词典查询时延', showCostConfig = true, imageData = null) {
   let list = [];
 
   if (result.message) {
@@ -39,6 +39,15 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
         copyText: fullTranslationText
       });
     }
+
+    // 如果存在 OCR 识别出的原文内容，作为一个独立条目添加，方便快速核对与复制
+    if (result.ocrText) {
+      list.push({
+        title: result.ocrText,
+        description: '识别出的原文',
+        copyText: result.ocrText
+      });
+    }
   }
 
   // 追加 Ollama 进阶入口
@@ -47,6 +56,8 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
     title: '✨ 使用 Ollama 进阶翻译...',
     description: '基于 AI 提供深度润色、语法剖析与多风格翻译',
     isAdvancedOllama: true,
+    ocrText: result.ocrText || '',
+    ocrImage: imageData, // [NEW] 透传预处理后的图片数据
     searchWord: searchWord,
     targetLangCode: targetLangCode,
     initialResult: result.translation || '',

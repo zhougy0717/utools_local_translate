@@ -29,7 +29,11 @@ const UI = {
     snake: document.getElementById('naming-snake'),
     constant: document.getElementById('naming-constant'),
     kebab: document.getElementById('naming-kebab')
-  }
+  },
+  ocrPreviewPane: document.getElementById('ocr-preview-pane'),
+  ocrPreviewImg: document.getElementById('ocr-preview-img'),
+  ocrEmptyHint: document.getElementById('ocr-empty-hint'),
+  promptPane: document.getElementById('prompt-pane')
 };
 
 /**
@@ -56,12 +60,26 @@ function switchTask(task) {
     // 命名时目标语言默认英文且隐藏语言选择器
     UI.langSelect.value = 'en';
     UI.langSelectGroup.style.display = 'none';
+    UI.ocrPreviewPane.style.display = 'none';
+    UI.promptPane.style.display = 'flex';
     UI.btnExecute.textContent = '执行命名';
+  } else if (task === 'ocr') {
+    UI.resultLabel.textContent = '图片翻译结果';
+    UI.resultText.style.display = 'block';
+    UI.namingResults.style.display = 'none';
+    UI.langSelectGroup.style.display = 'inline';
+    UI.ocrPreviewPane.style.display = 'flex';
+    UI.promptPane.style.display = 'none';
+    UI.btnExecute.textContent = '执行识图并翻译';
+    UI.sourceInput.placeholder = 'AI 识别出的原文将在此处呈现，您可以进行微调以精修译文...';
+    refreshOcrPreview();
   } else {
     UI.resultLabel.textContent = '翻译结果';
     UI.resultText.style.display = 'block';
     UI.namingResults.style.display = 'none';
     UI.langSelectGroup.style.display = 'inline';
+    UI.ocrPreviewPane.style.display = 'none';
+    UI.promptPane.style.display = 'flex';
     UI.btnExecute.textContent = '执行翻译';
   }
 
@@ -172,6 +190,54 @@ async function handleTask() {
 
   UI.btnExecute.disabled = true;
   const originalBtnText = UI.btnExecute.textContent;
+
+  // 图片翻译模式处理
+  if (currentTask === 'ocr') {
+    // 逻辑：如果识别出的原文由用户手动修改过，则降级为普通翻译不再执行耗时的 OCR
+    if (UI.sourceInput.value.trim() && isSourceEditedManually) {
+       UI.btnExecute.textContent = '正在翻译修正文本...';
+    } else {
+       UI.btnExecute.textContent = '正在识图中 (Vision)...';
+       const imageData = UI.ocrPreviewImg.src;
+       if (!imageData || imageData.length < 100) {
+         UI.resultText.textContent = '⚠️ 请先截取或粘贴图片。';
+         UI.btnExecute.disabled = false;
+         UI.btnExecute.textContent = originalBtnText;
+         return;
+       }
+
+       // 先预检预校验视觉能力
+       const check = await Bridge.checkVision();
+       if (!check.supported) {
+         UI.resultText.textContent = `❌ ${check.message}`;
+         UI.btnExecute.disabled = false;
+         UI.btnExecute.textContent = originalBtnText;
+         return;
+       }
+
+       try {
+         const ocrResult = await Bridge.ocrTranslate({
+            imageData,
+            targetLangCode: UI.langSelect.value
+         });
+         if (ocrResult.success) {
+            UI.sourceInput.value = ocrResult.ocrText;
+            UI.resultText.textContent = ocrResult.translation;
+            updateStatus(true, '图片识别并翻译成功');
+            isSourceEditedManually = false; // 重置编辑标志
+         } else {
+            UI.resultText.textContent = `❌ 识别失败: ${ocrResult.error}`;
+         }
+       } catch (e) {
+          UI.resultText.textContent = `❌ 插件内部错误: ${e.message}`;
+       } finally {
+          UI.btnExecute.disabled = false;
+          UI.btnExecute.textContent = originalBtnText;
+       }
+       return;
+    }
+  }
+
   UI.btnExecute.textContent = currentTask === 'naming' ? '命名中...' : '翻译中...';
   
   if (currentTask !== 'naming') {
@@ -240,11 +306,23 @@ async function init() {
   const config = Bridge.loadConfig();
   UI.sourceInput.value = config.initialText || '';
   
+  // [NEW] 如果是图片翻译任务且输入的是指令名 "图片翻译"，则清空原文框以免干扰识别
+  if (currentTask === 'ocr' && UI.sourceInput.value === '图片翻译') {
+    UI.sourceInput.value = '';
+  }
+  
   // 设置初始语言
   if (config.initialTargetLang) {
     UI.langSelect.value = config.initialTargetLang;
   }
   
+  // [NEW] 切换至指定的初始任务页签 (默认为普通翻译)
+  if (config.initialTask) {
+    switchTask(config.initialTask);
+  } else {
+    switchTask('advanced');
+  }
+
   // 初始化模型列表
   populateModels(config.models || [], config.currentModel);
   
@@ -296,9 +374,60 @@ async function init() {
   }
 }
 
-// 监听 Escape 键退出
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') Bridge.closePanel();
+// 记录原文是否被手动编辑过，用于 OCR 模式下的降级逻辑
+let isSourceEditedManually = false;
+UI.sourceInput.addEventListener('input', () => {
+    isSourceEditedManually = true;
+});
+
+/**
+ * 刷新 OCR 预览区
+ */
+function refreshOcrPreview() {
+    // 为确保显示逻辑稳如磐石：合并处理透传图片与剪贴板读取，直接赋能给 src
+    const config = Bridge.loadConfig();
+    const imgSource = config.initialImage || (Bridge.readImage ? Bridge.readImage() : null);
+
+    if (imgSource && imgSource.length > 200) { // 合法 Base64 线长通常很大
+        console.log('[Renderer] Image detected, updating src...');
+        UI.ocrPreviewImg.src = imgSource;
+        UI.ocrPreviewImg.style.display = 'block';
+        UI.ocrEmptyHint.style.display = 'none';
+
+        // 特殊：如果是通过透传进来且没有文字内容，自动触发 OCR
+        if (!UI.sourceInput.value.trim() && !isSourceEditedManually) {
+            handleTask();
+        }
+    } else {
+        console.warn('[Renderer] No image data available.');
+        UI.ocrPreviewImg.style.display = 'none';
+        UI.ocrEmptyHint.style.display = 'block';
+        UI.ocrEmptyHint.textContent = '检测到剪贴板中暂无有效图片。请尝试 Ctrl+V 粘贴内容。';
+    }
+}
+
+// 监听粘贴事件，支持在 OCR 模式或任何模式下直接通过粘贴图片切换至图片翻译
+window.addEventListener('paste', async (e) => {
+    const items = e.clipboardData.items;
+    for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            const file = item.getAsFile();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const base64 = event.target.result;
+                // 自动切换至 OCR 任务并预览展示
+                if (currentTask !== 'ocr') switchTask('ocr');
+                UI.ocrPreviewImg.src = base64;
+                UI.ocrPreviewImg.style.display = 'block';
+                UI.ocrEmptyHint.style.display = 'none';
+                UI.sourceInput.value = '';
+                isSourceEditedManually = false;
+                handleTask();
+            };
+            reader.readAsDataURL(file);
+            break;
+        }
+    }
 });
 
 init();

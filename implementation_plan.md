@@ -1,66 +1,62 @@
-# Implementation Plan - 基于 Ollama 多模态模型的图片翻译
+# 实施计划 - 图片翻译与视觉识别增强
 
-该计划旨在实现 Spec-00038 中定义的图片翻译功能。通过利用 Ollama 的 `llava` 等多模态模型，用户可以通过截图快速获取翻译结果。
+基于 `spec-00038` 设计规约，在进阶翻译中心增加图片翻译页签，并支持 uTools 列表视图下的快速识别结果展示。
 
-## User Review Required
+## 1. 核心架构调整
 
-> [!IMPORTANT]
-> **模型要求**：用户必须确保本地 Ollama 运行的是支持视觉的模型（如 `llava` 或 `qwen-vl`）。如果不满足，插件将返回错误提示。
-> **DataURL 长度**：高分辨率截图会导致极大的 DataURL 字符串，可能会对内存造成压力。目前计划采用原样透传，后续视性能情况考虑压缩。
+### 1.1 指令与入口
+#### [MODIFY] [plugin.json](file:///Users/guangyu/Projects/utools/utools_local_translate/plugin.json)
+- 在 `dict` 特性的 `cmds` 中增加 `{"type": "img", "label": "图片翻译"}`，允许 uTools 识别剪贴板图片并建议打开本插件。
 
-## Proposed Changes
+#### [MODIFY] [preload.js](file:///Users/guangyu/Projects/utools/utools_local_translate/preload.js)
+- 增强 `enter` 钩子对 `img` 负载的处理。
+- **重点实现**：在发送给后端前，利用 `Canvas` 进行图片预处理（长边限制 1024px，JPEG 0.8 压缩），解决负载超限问题。
 
----
+### 1.2 后端调度与逻辑
+#### [MODIFY] [src/core/backend_manager.js](file:///Users/guangyu/Projects/utools/utools_local_translate/src/core/backend_manager.js)
+- 完善 `queryImage` 方法：固化其直接分发至专用的 `OllamaBackend` 实例，不依赖全局 `activeBackend`。
+- 将识别与能力预检接口暴露给 `AdvancedPanelService` 的桥接 API。
 
-### [Component] 配置与指令
+#### [MODIFY] [src/backends/ollama/index.js](file:///Users/guangyu/Projects/utools/utools_local_translate/src/backends/ollama/index.js)
+- 实现 `checkVisionCapability`：请求 `/api/show` 确认模型包含 `projector` 类型。
+- 升级 `queryImage`：解析 AI 返回的结构化文本（提取源码与译文）。
 
-#### [MODIFY] [plugin.json](file:///c:/Users/Banny/code/local_translate/plugin.json)
-- 在 `dict` 特性的 `cmds` 中增加 `{ "type": "img", "label": "图片翻译" }`。
-
----
-
-### [Component] 提示词与核心逻辑
-
-#### [MODIFY] [prompt-manager.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/prompt-manager.js)
-- 新增 `vision` 模板，用于指导模型进行 OCR 提取和翻译。
-
-#### [MODIFY] [backend_manager.js](file:///c:/Users/Banny/code/local_translate/src/core/backend_manager.js)
-- 新增 `queryImage(imageData, callback, progressCallback)` 方法。
-- 实现路由分发逻辑：仅在后端支持 `queryImage` 时调用，否则提示不支持。
-
-#### [MODIFY] [src/backends/ollama/index.js](file:///c:/Users/Banny/code/local_translate/src/backends/ollama/index.js)
-- 实现 `queryImage` 方法。
-- 构造支持 `content` 数组的 `messages` 结构发送至 Ollama。
+#### [MODIFY] [src/backends/ollama/prompt-manager.js](file:///Users/guangyu/Projects/utools/utools_local_translate/src/backends/ollama/prompt-manager.js)
+- 调优 `vision` 提示词模板，确保输出符合 `SOURCE:` 和 `TARGET:` 的结构。
 
 ---
 
-### [Component] 触发与入口
+## 2. UI 展现层实现
 
-#### [MODIFY] [preload.js](file:///c:/Users/Banny/code/local_translate/preload.js)
-- 在 `enter` 回调中匹配 `action.type === 'img'`。
-- 从 `action.payload` 提取图片并分发至 `BackendManager`。
-- 实现异步加载状态展示。
+### 2.1 快速列表视图 (uTools List)
+#### [MODIFY] [src/utils/view_presenter.js](file:///Users/guangyu/Projects/utools/utools_local_translate/src/utils/view_presenter.js)
+- 更新 `buildResultItems`：若输入包含识别出的原文，则将其作为独立的列表项（带复制功能）展示，方便快速核对。
+
+### 2.2 进阶中心 UI (Advanced Center)
+#### [MODIFY] [src/backends/ollama/advanced-panel.html](file:///Users/guangyu/Projects/utools/utools_local_translate/src/backends/ollama/advanced-panel.html)
+- 侧边栏增加 `nav-item`。
+- 增加 `ocr-layout` 容器：
+    - `Top`: 翻译结果展示（只读）。
+    - `Middle`: OCR 识别结果（Textarea，可编辑）。
+    - `Bottom`: 原图参考（Img 预览）。
+
+#### [MODIFY] [src/backends/ollama/advanced-renderer.js](file:///Users/guangyu/Projects/utools/utools_local_translate/src/backends/ollama/advanced-renderer.js)
+- 实现 `switchTask('ocr')` 的 UI 切换。
+- **关键动线**：
+    - 进入 OCR 模式 -> `utools.readImage()`。
+    - 检测到图片 -> 预检查模型能力 -> 执行 OCR 翻译。
+    - 填充三个区域。
+    - 监听中部输入框变动，支持“执行重译”。
 
 ---
 
-### [Component] 自动化测试
+## 3. 验证计划
 
-#### [NEW] [ollama_backend.test.js](file:///c:/Users/Banny/code/local_translate/test/ollama_backend.test.js)
-- 验证 `queryImage` 生成的 Payload 是否符合 OpenAI 视觉模型标准。
-- 测试模型报错时的处理逻辑。
+### 自动化验证
+- 编写测试用例验证 `SOURCE:`/`TARGET:` 结构解析算法。
+- 验证图片缩放算法在不同分辨率下的输出体积。
 
-#### [NEW] [prompt_manager.test.js](file:///c:/Users/Banny/code/local_translate/test/prompt_manager.test.js)
-- 验证 `vision` 模板的加载和变量替换。
-
-## Verification Plan
-
-### Automated Tests
-- 运行 `npm test` 命令执行新编写的单元测试。
-- 使用 `jest` 模拟 Ollama API 响应。
-
-### Manual Verification
-1. 复制一张包含文字的图片到剪贴板。
-2. 打开 uTools 搜索框，选择“图片翻译”建议项。
-3. 观察列表是否显示“正在识别图片...”。
-4. 验证是否返回了正确的提取与翻译文本。
-5. 切换到不支持视觉的后端（如本地词典），验证是否提示“不支持图片识别”。
+### 手动交互路径
+1. **列表模式**：截图 -> 在 uTools 输入框按 `Tab` 呼出插件 -> 验证列表中出现原文和译文。
+2. **进阶模式**：从列表结果进入进阶翻译 -> 验证侧边栏新增页签及其三段式布局。
+3. **编辑流**：在进阶页面手动修改 OCR 错误识别的字符 -> 点击重译 -> 验证顶部结果由新文字生成。

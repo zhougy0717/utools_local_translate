@@ -26,15 +26,20 @@ class AdvancedPanelService {
    * @param {string} initialResult - 预填充的已有翻译结果
    * @param {string} backendName - 已有翻译结果的来源后端名
    */
-  openPanel(text = '', onCloseCallback = null, backend = null, targetLangCode = 'zh', initialResult = '', backendName = '') {
-    if (typeof document === 'undefined') return;
-
+  openPanel(text = '', onCloseCallback = null, backend = null, targetLangCode = 'zh', initialResult = '', backendName = '', initialImage = null, initialTask = 'advanced') {
+    // [VITAL FIX] 移除 if (this.isOpen) return，确保每次触发都能更新上下文
     this.isOpen = true;
     this.initialText = text;
     this.targetLangCode = targetLangCode;
     this.initialResult = initialResult;
     this.initialBackendName = backendName;
+    this.initialImage = initialImage;
+    this.initialTask = initialTask;
     this._onPanelClose = onCloseCallback;
+
+    // 闭包锁定当前轮次的最新数据
+    const _capturedImage = initialImage;
+    const _capturedTask = initialTask;
 
     if (typeof utools !== 'undefined') {
       utools.setExpendHeight(650);
@@ -50,6 +55,8 @@ class AdvancedPanelService {
           initialTargetLang: this.targetLangCode,
           initialResult: this.initialResult,
           initialBackendName: this.initialBackendName,
+          initialImage: _capturedImage,
+          initialTask: _capturedTask,
           models: config.models || [],
           currentModel: config.model || ''
         };
@@ -114,26 +121,62 @@ class AdvancedPanelService {
         }
       },
       // 关闭面板
-      closePanel: () => this.closePanel()
+      closePanel: () => this.closePanel(),
+      // 执行图片识别
+      ocrTranslate: (payload) => {
+        return new Promise((resolve) => {
+          if (!backend) return resolve({ success: false, error: '后端未初始化' });
+          backend.queryImage(payload.imageData, payload.targetLangCode, (err, result) => {
+            if (err) resolve({ success: false, error: err.message });
+            else resolve({ success: true, translation: result.translation, ocrText: result.ocrText || '' });
+          });
+        });
+      },
+      // 检查模型视觉能力
+      checkVision: () => backend ? backend.checkVisionCapability() : { supported: false, message: '后端未就绪' },
+      // 读取剪贴板图片 (供 iframe 使用)
+      readImage: () => {
+        if (typeof utools === 'undefined') return null;
+        try {
+          const img = utools.readImage();
+          if (!img) return null;
+          // 处理某些版本下可能返回的 NativeImage 对象
+          if (typeof img === 'object' && typeof img.toDataURL === 'function') {
+            return img.toDataURL();
+          }
+          // 处理不带前缀的纯 base64 (增强适配性)
+          if (typeof img === 'string' && img.length > 50 && !img.startsWith('data:')) {
+            return `data:image/png;base64,${img}`;
+          }
+          return img;
+        } catch (e) {
+          console.error('[Bridge] readImage error:', e);
+          return null;
+        }
+      }
     };
 
     let iframeContainer = document.getElementById(this.containerId);
-    if (!iframeContainer) {
-      iframeContainer = document.createElement('div');
-      iframeContainer.id = this.containerId;
-      Object.assign(iframeContainer.style, {
-        position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
-        zIndex: '999999', backgroundColor: '#ffffff'
-      });
-      
-      const iframe = document.createElement('iframe');
-      const htmlPath = path.resolve(__dirname, 'advanced-panel.html');
-      iframe.src = 'file://' + htmlPath.replace(/\\/g, '/');
-      Object.assign(iframe.style, { width: '100%', height: '100%', border: 'none', display: 'block' });
-      
-      iframeContainer.appendChild(iframe);
-      document.body.appendChild(iframeContainer);
+    // [VITAL FIX] 如果节点已存在，必须先移除原容器并强制重新载入。
+    // 这能有效触发布局内部 init() 重新执行，捕获最新的 Bridge 配置
+    if (iframeContainer) {
+      iframeContainer.remove();
     }
+
+    iframeContainer = document.createElement('div');
+    iframeContainer.id = this.containerId;
+    Object.assign(iframeContainer.style, {
+      position: 'fixed', top: '0', left: '0', width: '100vw', height: '100vh',
+      zIndex: '999999', backgroundColor: '#ffffff'
+    });
+    
+    const iframe = document.createElement('iframe');
+    const htmlPath = path.resolve(__dirname, 'advanced-panel.html');
+    iframe.src = 'file://' + htmlPath.replace(/\\/g, '/');
+    Object.assign(iframe.style, { width: '100%', height: '100%', border: 'none', display: 'block' });
+    
+    iframeContainer.appendChild(iframe);
+    document.body.appendChild(iframeContainer);
     iframeContainer.style.display = 'block';
   }
 

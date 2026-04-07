@@ -119,6 +119,30 @@ class OllamaBackend {
     }
 
     /**
+     * 极速预检模型是否具备视觉能力 (Vision/Projector)
+     * @returns {Promise<{supported: boolean, message: string}>}
+     */
+    async checkVisionCapability() {
+        try {
+            if (!this.config || !this.config.model) return { supported: false, message: '请在配置页先选择模型' };
+            const baseUrl = (this.config.apiBase || '').trim().replace(/\/+$/, '').replace(/\/v1$/, '');
+            const endpoint = `${baseUrl}/api/show`;
+            const res = await this._request(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({ name: this.config.model })
+            });
+            if (!res.ok) return { supported: false, message: `无法查询模型元数据 (HTTP ${res.status})` };
+            const data = await res.json();
+            // 在 Ollama /api/show 返回中，具备 projector 代表具备视觉。
+            // 某些新版本 Ollama 也会在 model_info 中标注
+            const isVision = !!(data.projector || (data.model_info && JSON.stringify(data.model_info).includes('vision')));
+            return { supported: isVision, message: isVision ? '模型支持视觉识图' : '当前模型不支持图片识别，请改用 llava 等模型' };
+        } catch (e) {
+            return { supported: false, message: '无法连接到 Ollama 服务进行能力检测' };
+        }
+    }
+
+    /**
      * 多模态图片识别与翻译
      * @param {string} imageData - 图片的 DataURL (Base64)
      * @param {string} targetLang - 目标语言代码
@@ -141,8 +165,8 @@ class OllamaBackend {
             const visionPrompt = this.promptManager.getPrompt('vision', { targetLangCode: targetLang });
 
             try {
-                // 尝试剥离 DataURL 前缀，以适配部分本地模型层对纯 Base64 的敏感度
-                const pureBase64 = imageData.includes('base64,') ? imageData.split('base64,')[1] : imageData;
+                // 确保图片数据包含正确的 Data URL 前缀（适配 OpenAI 兼容接口规范）
+                const finalImageUrl = imageData.startsWith('data:') ? imageData : `data:image/png;base64,${imageData}`;
 
                 // 构造 OpenAI 兼容的高级多模态 Content 结构
                 const data = await this.fetchChat({
@@ -150,8 +174,8 @@ class OllamaBackend {
                         {
                             role: 'user',
                             content: [
-                                { type: 'image_url', image_url: { url: pureBase64 } },
-                                { type: 'text', text: visionPrompt }
+                                { type: 'text', text: visionPrompt },
+                                { type: 'image_url', image_url: { url: finalImageUrl } }
                             ]
                         }
                     ],
@@ -164,10 +188,26 @@ class OllamaBackend {
                 }
 
                 if (data.choices && data.choices.length > 0 && data.choices[0].message) {
-                    const translation = data.choices[0].message.content.trim();
+                    const rawContent = data.choices[0].message.content;
+                    // 解析结构化输出: SOURCE: ... TARGET: ...
+                    let ocrText = '';
+                    let translation = '';
+                    
+                    const sourceMatch = rawContent.match(/SOURCE:([\s\S]*?)TARGET:/i);
+                    const targetMatch = rawContent.match(/TARGET:([\s\S]*)$/i);
+                    
+                    if (sourceMatch && targetMatch) {
+                        ocrText = sourceMatch[1].trim();
+                        translation = targetMatch[1].trim();
+                    } else {
+                        // 兜底处理：如果模型未按格式输出，则全量作为译文，暂存原文为空
+                        translation = rawContent.trim();
+                    }
+
                     callback(null, {
                         found: true,
                         translation: translation,
+                        ocrText: ocrText,
                         phonetic: ''
                     });
                 } else {

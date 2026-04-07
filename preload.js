@@ -47,6 +47,42 @@ function applyEnterWithWord(word, callbackSetList) {
   return true;
 }
 
+/**
+ * 客户端预处理：等比缩放并中度压缩图片，解决高清截图 Base64 负载过大问题
+ * @param {string} dataUrl - 原始 Base64
+ * @returns {Promise<string>} 压缩后的 Base64
+ */
+function _preprocessImage(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxDim = 1024; // 限制长边为 1024px
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxDim || height > maxDim) {
+        if (width > height) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        } else {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      // 转换为 JPEG 并设置 0.8 质量压缩
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = () => resolve(dataUrl); // 降级处理
+    img.src = dataUrl;
+  });
+}
+
 let searchTimeout = null;
 
 if (typeof window !== 'undefined') {
@@ -62,19 +98,22 @@ if (typeof window !== 'undefined') {
           // 处理图片输入 (来自 uTools 的搜索建议或截图)
           if (action && action.type === 'img' && action.payload) {
             console.log('[Preload] Image translation triggered');
-            callbackSetList(ViewPresenter.buildLoadingItem('正在识别并翻译图中文字...'));
+            callbackSetList(ViewPresenter.buildLoadingItem('正在预处理并识别图中文字...'));
             
             // 使用默认查词语言逻辑确定目标语言
             const { target } = UtoolsHelper.detectLanguages(''); // 默认目标
 
-            BackendManager.queryImage(action.payload, target, (err, result) => {
-              if (err) {
-                callbackSetList([{ title: '图片识别失败', description: err.message }]);
-                return;
-              }
-              callbackSetList(ViewPresenter.buildResultItems('图片翻译', result || { found: false }, false, 0, BackendManager.getBackendName(), false));
-            }, (progressMsg) => {
-              callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
+            _preprocessImage(action.payload).then(processedPayload => {
+                BackendManager.queryImage(processedPayload, target, (err, result) => {
+                    if (err) {
+                        callbackSetList(ViewPresenter.buildResultItems('图片翻译失败', { found: false, translation: '识别过程出错: ' + err.message }, false, 0, BackendManager.getBackendName(), false));
+                        return;
+                    }
+                    // [VITAL FIX] 必须传递 processedPayload，否则后续进阶中心无法通过 ocrImage 获取图源
+                    callbackSetList(ViewPresenter.buildResultItems('图片翻译', result || { found: false }, false, 0, BackendManager.getBackendName(), false, processedPayload));
+                }, (progressMsg) => {
+                    callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
+                });
             });
             return;
           }
@@ -151,7 +190,11 @@ if (typeof window !== 'undefined') {
           // 如果用户点击的是进阶翻译项
           if (itemData.isAdvancedOllama) {
             console.log('[Preload] Entering advanced translation center');
-            BackendManager.openAdvancedPanel(itemData.searchWord, itemData.targetLangCode, itemData.initialResult, itemData.backendName);
+            // 如果存在提取出的原文 ocrText，则透传它，否则使用 searchWord (指令名)
+            const source = itemData.ocrText || itemData.searchWord;
+            // 自动判断页签：有图就进 ocr，没图就进 advanced
+            const task = itemData.ocrImage ? 'ocr' : 'advanced';
+            BackendManager.openAdvancedPanel(source, itemData.targetLangCode, itemData.initialResult, itemData.backendName, itemData.ocrImage, task);
             return;
           }
 

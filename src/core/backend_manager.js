@@ -109,26 +109,33 @@ class BackendManager {
   }
 
   /**
-   * 委托调用底层引擎进行图片识别与翻译
+   * 委托调用专用的 Ollama 引擎进行图片识别与翻译 (路径隔离)
    * @param {string} imageData - 图片 DataURL/Base64
-   * @param {string} targetLang - 目标语言
+   * @param {string} targetLang - 目标语言代码
    * @param {Function} callback - 回调
    * @param {Function} progressCallback - 进度回调
    */
   queryImage(imageData, targetLang, callback, progressCallback) {
-    if (!this.activeBackend) {
-      callback(new Error('Backend not initialized'), null);
-      return;
-    }
-    if (typeof this.activeBackend.queryImage !== 'function') {
+    const targetBackend = this._getOllamaBackend();
+    if (!targetBackend) {
       callback(null, {
         found: false,
-        message: `当前后端 (${this.getBackendName()}) 不支持图片识别。请在设置中切换回 Ollama 并确保选用了支持视觉的模型。`
+        message: '未发现 Ollama 配置，请在设置中配置 Ollama 以支持图片识别。'
       });
       return;
     }
-    this.activeBackend.queryImage(imageData, targetLang, callback, progressCallback);
+    targetBackend.queryImage(imageData, targetLang, callback, progressCallback);
   }
+
+  /**
+   * 检查配置中 Ollama 模型的视觉能力
+   */
+  async checkVisionCapability() {
+    const targetBackend = this._getOllamaBackend();
+    if (!targetBackend) return { supported: false, message: 'Ollama 后端未配置' };
+    return targetBackend.checkVisionCapability();
+  }
+
 
   /**
    * 重载后端（通常在配置发生改变时被调用）
@@ -185,22 +192,38 @@ class BackendManager {
    * 打开 Ollama 进阶翻译面板
    * @param {string} text - 待处理的原始文本
    * @param {string} targetLangCode - 目标语言代码 ('en', 'zh' 等)
+   * @param {string} initialResult - 已有的翻译结果
+   * @param {string} backendName - 来源后端
+   * @param {string} initialImage - 初始图片 DataURL
+   * @param {string} initialTask - [NEW] 初始任务类型 (advanced, naming, ocr)
    */
-  openAdvancedPanel(text, targetLangCode, initialResult = '', backendName = '') {
-    // 方案：如果当前 activeBackend 就是 Ollama，直接复用；否则从配置中创建一个专用实例。
-    let targetBackend = null;
-    if (this.activeBackend && this.activeBackend.constructor.name === 'OllamaBackend') {
-      targetBackend = this.activeBackend;
-    } else {
-      if (!this._dedicatedOllamaBackend) {
-        this._dedicatedOllamaBackend = createOllamaBackend(this.currentConfig.ollama);
-      }
-      targetBackend = this._dedicatedOllamaBackend;
+  openAdvancedPanel(text, targetLangCode, initialResult = '', backendName = '', initialImage = null, initialTask = 'advanced') {
+    const targetBackend = this._getOllamaBackend();
+    if (!targetBackend) {
+      if (typeof utools !== 'undefined') utools.showNotification('请先配置 Ollama 以启用进阶翻译中心');
+      return;
     }
 
     this.advancedPanelService.openPanel(text, () => {
-      // 面板关闭时的处理（如需要刷新主列表）
-    }, targetBackend, targetLangCode, initialResult, backendName);
+      // 面板关闭时的处理
+    }, targetBackend, targetLangCode, initialResult, backendName, initialImage, initialTask);
+  }
+
+  /**
+   * 内部获取一个专用于视觉或进阶任务的 Ollama 实例
+   * @private
+   */
+  _getOllamaBackend() {
+    // 方案：如果当前 activeBackend 就是 Ollama，直接复用；否则从配置中创建一个专用实例。
+    if (this.activeBackend && this.activeBackend.constructor.name === 'OllamaBackend') {
+      return this.activeBackend;
+    }
+    if (!this._dedicatedOllamaBackend) {
+      if (this.currentConfig && this.currentConfig.ollama) {
+        this._dedicatedOllamaBackend = createOllamaBackend(this.currentConfig.ollama);
+      }
+    }
+    return this._dedicatedOllamaBackend;
   }
 
   /**

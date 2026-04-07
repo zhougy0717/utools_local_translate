@@ -25,9 +25,37 @@
 4.  调用 `BackendManager.queryImage(payload, ...)`。
 
 ### 2.3 接口定义 (`src/core/backend_manager.js`)
-1.  在 `BackendManager` 类中新增 `queryImage(imageData, callback, progressCallback)` 方法。
-2.  方法内判断当前 `activeBackend` 是否支持视觉任务（通过检查 `this.activeBackend.queryImage` 是否为 function）。
-3.  如果不满足（如当前选中了本地词典或 LibreTranslate），则回调返回引导信息：“当前后端不支持图片识别，请在设置中切换至 Ollama”。
+1.  **路径隔离**：在 `BackendManager` 类中新增 `queryImage` 方法。
+2.  **直接调度与能力预检**：
+    *   **步骤 A**：获取/创建专用的 Ollama 实例。
+    *   **步骤 B (能力校验)**：在发起重量级图片传输前，优先检查当前模型是否具备 `vision` 能力（可通过缓存或调用 Ollama `/api/show` 接口获取模型描述）。
+3.  **智能引导**：若检测到模型不支持视觉（如 `llama3`），则直接拦截并返回引导信息：“当前模型不支持图片识别，请配置 llava 等具备 Vision 能力的模型”。
+
+#### 流程活动图 (Activity Diagram)
+
+```plantuml
+@startuml
+skinparam handwritten false
+skinparam monochrome true
+title 图片翻译执行流程 (含模型能力校验)
+
+start
+:用户发起图片翻译任务;
+if (Ollama 已配置且有模型?) then (yes)
+  :获取/创建 _dedicatedOllamaBackend 实例;
+  if (缓存或 /api/show 确认模型支持 Vision?) then (yes)
+    :使用该专用实例处理图片任务;
+    :解析识别结果并返回;
+  else (no)
+    :返回错误引导：当前模型不支持视觉，请改用 llava 等模型;
+  endif
+else (no)
+  :返回错误引导：请先配置 Ollama 后端以支持图片任务;
+endif
+stop
+@enduml
+```
+
 
 ### 2.4 后端实现 (`src/backends/ollama/index.js`)
 1.  实现 `queryImage(imageData, callback, progressCallback)`：
@@ -60,8 +88,12 @@
 
 ## 3. 技术难点与考量
 *   **模型兼容性**：用户必须在 Ollama 中拉取了支持视觉的模型（如 `llava:7b`）。若模型不支持，接口会报错，需给出清晰的重试或更换模型建议。
-*   **Base64 负载**：高清截图的 Base64 字符串很大，需确保 IPC 和 API 请求不超时。
-*   **处理多行文本**：模型输出通常带有换行符，需在 `ViewPresenter` 中妥善转换为 uTools 列表项。
+*   **Base64 负载与预处理**：
+    *   **问题**：高清截图的 Base64 字符串极大（>10MB），导致传输延迟和模型推理过载。
+    *   **对策**：在上传前进行**客户端预处理**。
+        *   **等比缩略**：强制将图片长边缩放至不超过 **1024px**。
+        *   **格式压缩**：转换为 `image/jpeg` 并应用 `0.8` 的压缩质量。
+        *   **效果**：将 Payload 控制在 500KB - 1MB 左右，显著提升系统响应速度。
 
 ## 5. 测试设计
 
