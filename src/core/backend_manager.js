@@ -250,7 +250,11 @@ class BackendManager {
     ];
     containerIds.forEach(id => {
       const el = document.getElementById(id);
-      if (el) el.remove();
+      if (el) {
+        el.remove();
+        // 强制重置高度以处理点击外部或由于 uTools 会话管理导致的残留高度问题
+        if (!isSilent && typeof utools !== 'undefined') utools.setExpendHeight(0);
+      }
     });
 
     // 4. 清理全局 API 钩子

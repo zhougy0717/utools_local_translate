@@ -133,6 +133,9 @@ if (typeof window !== 'undefined') {
           ]);
         },
         search: function (action, searchWord, callbackSetList) {
+          // 在任何搜索或指令输入前，优先清理可能存在的配置面板 (静默模式)
+          BackendManager.closeCurrentConfigPanel(true);
+
           if (searchTimeout) {
             clearTimeout(searchTimeout);
             searchTimeout = null;

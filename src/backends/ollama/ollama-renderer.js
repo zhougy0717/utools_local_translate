@@ -212,8 +212,12 @@ UI.btnConfigProxy.addEventListener('click', () => Bridge.openGlobalProxyConfig()
 
 // 快捷退出：ESC
 window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') Bridge.closePanel();
-});
+    if (e.key === 'Escape') {
+        e.stopPropagation();
+        e.preventDefault();
+        Bridge.closePanel();
+    }
+}, true);
 
 // 启动
 init();
