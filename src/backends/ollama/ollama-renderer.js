@@ -9,6 +9,7 @@ const UI = {
     apiBase: document.getElementById('apiBase'),
     apiKey: document.getElementById('apiKey'),
     modelSelect: document.getElementById('model-select'),
+    visionModelSelect: document.getElementById('vision-model-select'),
     btnRefreshModels: document.getElementById('btn-refresh-models'),
     prompt: document.getElementById('prompt'),
     proxyLabel: document.getElementById('proxy-label'),
@@ -44,22 +45,35 @@ function updateHeaderStatus(isOnline, text) {
 /**
  * 填充模型下拉列表
  */
-function populateModels(models, currentModel = '') {
+function populateModels(models, currentModel = '', currentVisionModel = '') {
     UI.modelSelect.innerHTML = '';
+    UI.visionModelSelect.innerHTML = '';
+
     if (!models || models.length === 0) {
-        const opt = document.createElement('option');
-        opt.value = '';
-        opt.textContent = '未找到可用模型 (请先测试连接)';
-        UI.modelSelect.appendChild(opt);
+        const placeholder = '未找到可用模型 (请先测试连接)';
+        [UI.modelSelect, UI.visionModelSelect].forEach(select => {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = placeholder;
+            select.appendChild(opt);
+        });
         return;
     }
 
     models.forEach(name => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = name;
-        if (name === currentModel) opt.selected = true;
-        UI.modelSelect.appendChild(opt);
+        // 为文本模型填充
+        const optText = document.createElement('option');
+        optText.value = name;
+        optText.textContent = name;
+        if (name === currentModel) optText.selected = true;
+        UI.modelSelect.appendChild(optText);
+
+        // 为图片模型填充
+        const optVision = document.createElement('option');
+        optVision.value = name;
+        optVision.textContent = name;
+        if (name === currentVisionModel) optVision.selected = true;
+        UI.visionModelSelect.appendChild(optVision);
     });
 }
 
@@ -88,13 +102,22 @@ async function init() {
     UI.proxyToggle.checked = config.useProxy || false;
 
     // 填充模型列表并初始化位置
-    populateModels(config.models || [], config.model);
+    populateModels(config.models || [], config.model, config.visionModel);
+    
+    // 如果缓存的模型不在列表里，手动追加
     if (!UI.modelSelect.value && config.model) {
         const opt = document.createElement('option');
         opt.value = config.model;
         opt.textContent = `${config.model} (缓存)`;
         opt.selected = true;
         UI.modelSelect.prepend(opt);
+    }
+    if (!UI.visionModelSelect.value && config.visionModel) {
+        const opt = document.createElement('option');
+        opt.value = config.visionModel;
+        opt.textContent = `${config.visionModel} (缓存)`;
+        opt.selected = true;
+        UI.visionModelSelect.prepend(opt);
     }
 
     updateProxyUI(config.globalProxyStatus, config.globalProxyAddr, config.useProxy);
@@ -109,6 +132,7 @@ function handleSave(shouldClose = false) {
         apiBase: UI.apiBase.value.trim(),
         apiKey: UI.apiKey.value.trim(),
         model: UI.modelSelect.value,
+        visionModel: UI.visionModelSelect.value,
         prompt: UI.prompt.value.trim(),
         useProxy: UI.proxyToggle.checked,
         models: Array.from(UI.modelSelect.options).map(opt => opt.value).filter(v => v)
@@ -135,18 +159,15 @@ async function handleRefreshModels(silent = false) {
     }
 
     let baseUrl = apiBase.replace(/\/+$/, '');
-    if (baseUrl.endsWith('/v1')) {
-        baseUrl = baseUrl.substring(0, baseUrl.length - 3).replace(/\/+$/, '');
-    }
 
-    if (!silent) showMessage('正在连接 Ollama...', 'loading');
+    if (!silent) showMessage('正在连接服务器并获取模型列表...', 'loading');
     updateHeaderStatus(false, '检查中...');
 
     const result = await Bridge.testConnection(baseUrl, apiKey);
     
     if (result.success) {
         const models = result.models || [];
-        populateModels(models, UI.modelSelect.value);
+        populateModels(models, UI.modelSelect.value, UI.visionModelSelect.value);
         
         // 成功获取模型后，执行一次自动保存（更新模型列表缓存）
         handleSave(false);
@@ -162,7 +183,7 @@ async function handleRefreshModels(silent = false) {
 }
 
 // 事件绑定：即时保存
-const inputIds = ['apiBase', 'apiKey', 'model-select', 'prompt', 'proxy-toggle'];
+const inputIds = ['apiBase', 'apiKey', 'model-select', 'vision-model-select', 'prompt', 'proxy-toggle'];
 inputIds.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;

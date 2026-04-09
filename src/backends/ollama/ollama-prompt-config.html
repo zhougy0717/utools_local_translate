@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ollama 深度配置</title>
+    <title>Ollama 配置</title>
     <style>
         :root {
             --bg-color: #f6f8fa;
@@ -315,7 +315,7 @@
 <div class="config-container">
     <header>
         <div style="display: flex; align-items: center; gap: 10px;">
-            <h2>Ollama 深度配置</h2>
+            <h2>Ollama 配置</h2>
             <div id="connection-status" class="status-dot"></div>
             <span id="header-status-text" class="header-status-text">检查中...</span>
         </div>
@@ -339,13 +339,23 @@
         
         <div class="form-row">
             <div class="form-group" style="flex: 1;">
-                <label for="model-select">模型名称 (Model)</label>
+                <label for="model-select">文本翻译模型 (Text Model)</label>
                 <div style="display: flex; gap: 8px;">
                     <select id="model-select">
                         <option value="">载入中...</option>
                     </select>
-                    <button id="btn-refresh-models" class="btn btn-refresh" title="刷新列表">🔄</button>
                 </div>
+            </div>
+            <div class="form-group" style="flex: 1;">
+                <label for="vision-model-select">图片翻译模型 (Vision Model)</label>
+                <div style="display: flex; gap: 8px;">
+                    <select id="vision-model-select">
+                        <option value="">载入中...</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-group flex-auto">
+                <button id="btn-refresh-models" class="btn btn-refresh" title="刷新列表">🔄</button>
             </div>
         </div>
     </div>
@@ -377,8 +387,6 @@
     </div>
 
     <div id="status-message"></div>
-
-    <!-- 移除了底部的 action-bar -->
 </div>
 
 <script src="./ollama-renderer.js"></script>
