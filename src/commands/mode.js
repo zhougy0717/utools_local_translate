@@ -1,5 +1,6 @@
 const fs = require('fs');
 const { OllamaConfig } = require('../backends/ollama/config');
+const { LibreTranslateConfig } = require('../backends/libretranslate/config');
 const { getDictStatus: getBackendDictStatus, DICT_STATUS } = require('../backends/dict');
 
 const MODES = [
@@ -49,10 +50,10 @@ function getOllamaStatus(_appConfig) {
     return { status: STATUS.UNAVAILABLE };
 }
 
-function getLibreStatus(appConfig) {
-    appConfig = appConfig || {};
-    const libreConfig = appConfig.libretranslate || {};
-    if (libreConfig.apiBase) {
+function getLibreStatus(_appConfig) {
+    const configManager = new LibreTranslateConfig();
+    const config = configManager.load();
+    if (config.apiBase) {
         return { status: STATUS.READY };
     }
     return { status: STATUS.UNAVAILABLE };
@@ -199,6 +200,35 @@ module.exports = {
             return { disableClear: true };
         }
 
+        // 1.3 处理 LibreTranslate 的子命令配置逻辑 (spec-00041)
+        if (itemData.modeId === 'libretranslate' && !itemData.action) {
+            const configManager = new LibreTranslateConfig();
+            const config = configManager.load();
+            const apiBase = config.apiBase || '未配置地址';
+
+            callbackSetList([
+                {
+                    title: '确认启用 LibreTranslate 翻译模式',
+                    description: `当前服务: ${apiBase}`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'libretranslate',
+                    action: 'confirm_libre',
+                    icon: Icons.LIBRE
+                },
+                {
+                    title: '打开 LibreTranslate 配置面板',
+                    description: `⚙️ 可视化设置服务器、Key 与语言偏好`,
+                    isCommandContext: true,
+                    commandTrigger: 'mode',
+                    modeId: 'libretranslate',
+                    action: 'open_libre_config',
+                    icon: Icons.LIBRE
+                }
+            ]);
+            return { disableClear: true };
+        }
+
         // 2.1 处理离线词典的具体子操作
         if (itemData.action === 'confirm_dict') {
             appConfig.backends.offline_dict = true;
@@ -236,6 +266,23 @@ module.exports = {
             return { openConfigPanel: true, reloadBackend: true };
         }
 
+        // 2.3 处理 LibreTranslate 的具体子操作
+        if (itemData.action === 'confirm_libre') {
+            appConfig.backends.offline_dict = false;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = true;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+            return { reloadBackend: true, restoreSearch: true };
+        }
+
+        if (itemData.action === 'open_libre_config') {
+            appConfig.backends.offline_dict = false;
+            appConfig.backends.ollama = false;
+            appConfig.backends.libretranslate = true;
+            if (typeof utools !== 'undefined') utools.dbStorage.setItem('app_config', appConfig);
+            return { openConfigPanel: true, reloadBackend: true };
+        }
+
         // 3. 处理常规模式逻辑 (及原有 Fallback)
         if (itemData.action === 'open_libre_docs') {
             if (typeof utools !== 'undefined') {
@@ -270,19 +317,9 @@ module.exports = {
                 utools.dbStorage.setItem('app_config', appConfig);
             }
 
-            if (itemData.modeId === 'offline_dict' || itemData.modeId === 'ollama') {
-                // 这两者支持内置配置面板
+            if (itemData.modeId === 'offline_dict' || itemData.modeId === 'ollama' || itemData.modeId === 'libretranslate') {
+                // 这三者都支持内置配置面板
                 return { openConfigPanel: true, reloadBackend: true };
-            } else if (itemData.modeId === 'libretranslate') {
-                // LibreTranslate 目前仅提示指令 (spec-00032)
-                callbackSetList([
-                    { 
-                        title: '配置 LibreTranslate', 
-                        description: '设置服务器地址与 API Key (/libre <url> [key])',
-                        icon: Icons.LIBRE
-                    }
-                ]);
-                return { disableClear: true };
             }
         }
 

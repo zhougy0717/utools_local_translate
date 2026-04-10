@@ -1,3 +1,5 @@
+const path = require('path');
+const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const { LibreTranslateConfig } = require('./config');
@@ -42,13 +44,17 @@ class LibreTranslateBackend {
      * @param {function} progressCallback - 进度回调 (不使用)
      */
     queryWord(text, sourceLang, targetLang, callback, progressCallback = null) {
+        // 优先使用传入参数，否则使用配置中的默认值
+        const sLang = sourceLang || this.config.sourceLang || 'auto';
+        const tLang = targetLang || this.config.targetLang || 'zh';
+
         // 使用配置的地址或默认本地地址
         const apiBase = this.config.apiBase || 'http://127.0.0.1:5000';
 
         const payload = {
             q: text,
-            source: sourceLang,
-            target: targetLang,
+            source: sLang,
+            target: tLang,
             format: 'text',
             api_key: this.config.apiKey
         };
@@ -150,6 +156,91 @@ class LibreTranslateBackend {
         if (this.currentAbortController) {
             this.currentAbortController.abort();
             this.currentAbortController = null;
+        }
+    }
+
+    /**
+     * 打开后端配置面板
+     * @param {function} onCloseCallback 
+     */
+    openConfigPanel(onCloseCallback) {
+        if (typeof utools === 'undefined') return;
+
+        const configPath = path.join(__dirname, 'libretranslate-config.html');
+        let htmlContent = fs.readFileSync(configPath, 'utf8');
+
+        // 注入渲染器代码
+        const rendererPath = path.join(__dirname, 'libretranslate-renderer.js');
+        const rendererJs = fs.readFileSync(rendererPath, 'utf8');
+        htmlContent = htmlContent.replace('<!-- RENDERER_JS -->', `<script>${rendererJs}</script>`);
+
+        // 设置面板并注入桥接 API
+        utools.setExpendHeight(540);
+        const containerId = 'libretranslate-config-container';
+        
+        // 确保清理旧容器
+        const old = document.getElementById(containerId);
+        if (old) old.remove();
+
+        const container = document.createElement('div');
+        container.id = containerId;
+        container.style.cssText = 'position:fixed; top:0; left:0; right:0; bottom:0; z-index:999; background:#fff;';
+        
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'width:100%; height:100%; border:none;';
+        container.appendChild(iframe);
+        document.body.appendChild(container);
+
+        iframe.contentWindow.document.open();
+        iframe.contentWindow.document.write(htmlContent);
+        iframe.contentWindow.document.close();
+
+        // 注入桥接 API
+        iframe.contentWindow._libreAPI = {
+            loadConfig: () => {
+                return this.configManager.load();
+            },
+            saveConfig: (newConfig) => {
+                this.configManager.save(newConfig);
+                this.reloadConfig();
+                return { success: true };
+            },
+            testConnection: async (apiBase, apiKey) => {
+                try {
+                    const endpoint = `${apiBase.replace(/\/+$/, '')}/languages`;
+                    const res = await this._directRequest(endpoint, { method: 'GET' });
+                    if (res.ok) {
+                        const langs = await res.json();
+                        return { success: true, languages: langs };
+                    }
+                    return { success: false, message: `HTTP ${res.status}` };
+                } catch (e) {
+                    return { success: false, message: e.message };
+                }
+            },
+            closePanel: () => {
+                this.closePanel();
+                if (onCloseCallback) onCloseCallback();
+            }
+        };
+
+        this.configContainer = container;
+    }
+
+    /**
+     * 关闭配置面板
+     * @param {boolean} isSilent 
+     */
+    closePanel(isSilent = false) {
+        if (this.configContainer) {
+            this.configContainer.remove();
+            this.configContainer = null;
+        }
+        const container = document.getElementById('libretranslate-config-container');
+        if (container) container.remove();
+        
+        if (!isSilent && typeof utools !== 'undefined') {
+            utools.setExpendHeight(0);
         }
     }
 }

@@ -58,8 +58,21 @@ class AdvancedPanelService {
           initialImage: _capturedImage,
           initialTask: _capturedTask,
           models: config.models || [],
-          currentModel: config.model || ''
+          model: config.model || '',
+          visionModel: config.visionModel || ''
         };
+      },
+      // 保存配置 (常用于即时更新模型选择)
+      saveConfig: (newConfig) => {
+        if (backend) {
+          // 这里我们通常合并保存，确保不丢失其他字段
+          const oldConfig = backend.configManager.load();
+          const merged = Object.assign({}, oldConfig, newConfig);
+          backend.configManager.save(merged);
+          backend.reloadConfig();
+          return true;
+        }
+        return false;
       },
       // 获取初始提示词 (保留 [TEXT] 占位符，由渲染器在执行时动态替换)
       getInitialPrompt: (targetLangCode, taskType = 'advanced') => {

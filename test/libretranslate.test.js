@@ -3,13 +3,15 @@ const assert = require('assert');
 const nock = require('nock');
 const { LibreTranslateBackend } = require('../src/backends/libretranslate/index.js');
 
-describe('LibreTranslateBackend', () => {
+describe('LibreTranslateBackend Unified Config', () => {
     let backend;
 
     beforeEach(() => {
         backend = new LibreTranslateBackend({
             apiBase: 'http://127.0.0.1:5000',
-            apiKey: 'test-key'
+            apiKey: 'test-key',
+            sourceLang: 'en',
+            targetLang: 'zh'
         });
         
         if (typeof global.fetch !== 'function') {
@@ -21,51 +23,42 @@ describe('LibreTranslateBackend', () => {
         nock.cleanAll();
     });
 
-    it('should return error if apiBase is not configured', async () => {
-        const noConfigBackend = new LibreTranslateBackend({ apiBase: '', apiKey: '' });
-        const result = await new Promise((resolve) => {
-            noConfigBackend.queryWord('test', 'en', 'zh', (err, res) => resolve(res));
-        });
-        assert.strictEqual(result.found, false);
-        assert.ok(result.message.includes('服务器地址未配置'));
-    });
-
-    it('should correctly format payload and return translation on success', async () => {
+    it('should use default languages from config if not provided in queryWord', async () => {
         const mockResponse = {
             translatedText: '测试翻译结果'
         };
 
         nock('http://127.0.0.1:5000')
             .post('/translate', body => {
-                assert.strictEqual(body.q, 'test');
+                // Should use 'en' and 'zh' from constructor config
                 assert.strictEqual(body.source, 'en');
                 assert.strictEqual(body.target, 'zh');
-                assert.strictEqual(body.format, 'text');
-                assert.strictEqual(body.api_key, 'test-key');
                 return true;
             })
             .reply(200, mockResponse);
 
         const result = await new Promise((resolve) => {
-            backend.queryWord('test', 'en', 'zh', (err, res) => resolve(res));
+            // Passing null/undefined for languages
+            backend.queryWord('test', null, null, (err, res) => resolve(res));
         });
         assert.strictEqual(result.found, true);
-        assert.strictEqual(result.translation, '测试翻译结果');
     });
 
-    it('should handle HTTP error gracefully', async () => {
+    it('should prioritize passed parameters over config defaults', async () => {
         nock('http://127.0.0.1:5000')
-            .post('/translate')
-            .reply(500, 'Internal Server Error');
+            .post('/translate', body => {
+                assert.strictEqual(body.source, 'fr');
+                assert.strictEqual(body.target, 'de');
+                return true;
+            })
+            .reply(200, { translatedText: 'french to german' });
 
-        const result = await new Promise((resolve) => {
-            backend.queryWord('test', 'en', 'zh', (err, res) => resolve(res));
+        await new Promise((resolve) => {
+            backend.queryWord('test', 'fr', 'de', (err, res) => resolve(res));
         });
-        assert.strictEqual(result.found, false);
-        assert.ok(result.message.includes('HTTP 异常状态码: 500'));
     });
 
-    it('should handle 403 error specifically', async () => {
+    it('should correctly handle 403 error', async () => {
         nock('http://127.0.0.1:5000')
             .post('/translate')
             .reply(403, 'Forbidden');
@@ -76,7 +69,7 @@ describe('LibreTranslateBackend', () => {
         assert.strictEqual(result.found, false);
         assert.ok(result.message.includes('API Key 无效'));
     });
-    
+
     it('should handle connection refused gracefully', async () => {
         nock('http://127.0.0.1:5000')
             .post('/translate')

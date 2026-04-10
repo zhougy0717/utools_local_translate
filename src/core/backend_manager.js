@@ -245,6 +245,7 @@ class BackendManager {
     const containerIds = [
       'ollama-config-container', 
       'dict-config-container', 
+      'libretranslate-config-container',
       'proxy-config-container',
       'ollama-advanced-panel-container'
     ];
@@ -260,6 +261,7 @@ class BackendManager {
     // 4. 清理全局 API 钩子
     delete window._ollamaAPI;
     delete window._dictAPI;
+    delete window._libreAPI;
     delete window._advancedAPI;
     
     // 5. 清理旧式钩子

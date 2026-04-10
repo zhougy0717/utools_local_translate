@@ -15,6 +15,7 @@ const UI = {
   langSelect: document.getElementById('lang-select'),
   langSelectGroup: document.getElementById('lang-select-group'),
   modelSelect: document.getElementById('model-select'),
+  modelSelectLabel: document.getElementById('model-select-label'),
   connectionStatus: document.getElementById('connection-status'),
   tokenUsage: document.getElementById('token-usage'),
   // 核心新增：侧边栏与多风格结果视图容器
@@ -72,6 +73,12 @@ function switchTask(task) {
     UI.promptPane.style.display = 'none';
     UI.btnExecute.textContent = '执行识图并翻译';
     UI.sourceInput.placeholder = 'AI 识别出的原文将在此处呈现，您可以进行微调以精修译文...';
+    
+    // 动态更新模型选择逻辑
+    UI.modelSelectLabel.textContent = '图片翻译模型:';
+    const config = Bridge.loadConfig();
+    UI.modelSelect.value = config.visionModel || config.model; // 优先使用 visionModel
+    
     refreshOcrPreview();
   } else {
     UI.resultLabel.textContent = '翻译结果';
@@ -81,6 +88,11 @@ function switchTask(task) {
     UI.ocrPreviewPane.style.display = 'none';
     UI.promptPane.style.display = 'flex';
     UI.btnExecute.textContent = '执行翻译';
+    
+    // 恢复为文本模型选择
+    UI.modelSelectLabel.textContent = '使用模型:';
+    const config = Bridge.loadConfig();
+    UI.modelSelect.value = config.model;
   }
 
   // 立即根据当前原文更新提示词
@@ -107,7 +119,7 @@ function updateStatus(isOnline, message = '', token = 0) {
 /**
  * 填充模型选择
  */
-function populateModels(models, currentModel = '') {
+function populateModels(models, selectedModel = '') {
   UI.modelSelect.innerHTML = '';
   if (!models || models.length === 0) {
     const opt = document.createElement('option');
@@ -121,7 +133,7 @@ function populateModels(models, currentModel = '') {
     const opt = document.createElement('option');
     opt.value = m;
     opt.textContent = m;
-    if (m === currentModel) opt.selected = true;
+    if (m === selectedModel) opt.selected = true;
     UI.modelSelect.appendChild(opt);
   });
 }
@@ -304,6 +316,12 @@ async function init() {
   }
 
   const config = Bridge.loadConfig();
+
+  // 初始化模型列表 (根据初次进入的任务类型决定选中哪个模型)
+  const initialTaskModel = (config.initialTask === 'ocr') ? (config.visionModel || config.model) : config.model;
+  populateModels(config.models || [], initialTaskModel);
+  
+  // 初始化内容
   UI.sourceInput.value = config.initialText || '';
   
   // [NEW] 如果是图片翻译任务且输入的是指令名 "图片翻译"，则清空原文框以免干扰识别
@@ -317,14 +335,12 @@ async function init() {
   }
   
   // [NEW] 切换至指定的初始任务页签 (默认为普通翻译)
+  // 注意：这里先 populateModels 后 switchTask 是安全的，因为 switchTask 内部也会根据最新 config 再次校正模型选中值
   if (config.initialTask) {
     switchTask(config.initialTask);
   } else {
     switchTask('advanced');
   }
-
-  // 初始化模型列表
-  populateModels(config.models || [], config.currentModel);
   
   // 初始化提示词
   refreshPrompt();
@@ -372,6 +388,20 @@ async function init() {
   if (!config.initialResult) {
     updateStatus(check.online, check.message);
   }
+
+  // [NEW] 监听模型选择变化并保存
+  UI.modelSelect.addEventListener('change', () => {
+    const selectedModel = UI.modelSelect.value;
+    const configToUpdate = {};
+    if (currentTask === 'ocr') {
+        configToUpdate.visionModel = selectedModel;
+    } else {
+        configToUpdate.model = selectedModel;
+    }
+    
+    Bridge.saveConfig(configToUpdate);
+    console.log(`[Advanced] Saved ${currentTask === 'ocr' ? 'visionModel' : 'model'}: ${selectedModel}`);
+  });
 }
 
 // 记录原文是否被手动编辑过，用于 OCR 模式下的降级逻辑
