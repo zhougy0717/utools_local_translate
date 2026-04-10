@@ -41,6 +41,14 @@ class OllamaBackend {
     }
 
     /**
+     * 极速检查后端是否已基本配置就绪（至少选择了模型）
+     * @returns {boolean}
+     */
+    isConfigured() {
+        return !!(this.config && this.config.model);
+    }
+
+    /**
      * @param {string} text - 待翻译的原文本
      * @param {string} sourceLang - 源语言代码 (例如 'en')
      * @param {string} targetLang - 目标语言代码 (例如 'zh')

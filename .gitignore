@@ -7,4 +7,4 @@ logs/
 *.log
 package
 release/
-词典
+词典.DS_Store

@@ -198,15 +198,34 @@ class BackendManager {
    * @param {string} initialTask - [NEW] 初始任务类型 (advanced, naming, ocr)
    */
   openAdvancedPanel(text, targetLangCode, initialResult = '', backendName = '', initialImage = null, initialTask = 'advanced') {
-    const targetBackend = this._getOllamaBackend();
-    if (!targetBackend) {
-      if (typeof utools !== 'undefined') utools.showNotification('请先配置 Ollama 以启用进阶翻译中心');
-      return;
-    }
-
+    let targetBackend = this._getOllamaBackend();
+    
+    // [VITAL] 遵循用户要求 1：点击后必须无视配置状态，优先打开进阶翻译工作站页面
     this.advancedPanelService.openPanel(text, () => {
       // 面板关闭时的处理
     }, targetBackend, targetLangCode, initialResult, backendName, initialImage, initialTask);
+
+    // [VITAL] 遵循用户要求 2：仅当检测到未配置且确实无法使用功能时，才弹出对话框（Message Box）引导配置，而非系统通知
+    const isConfigured = targetBackend && (typeof targetBackend.isConfigured === 'function' ? targetBackend.isConfigured() : true);
+    
+    if (!isConfigured) {
+      if (typeof utools !== 'undefined') {
+        utools.showMessageBox({
+          type: 'info',
+          title: 'Ollama 尚未就绪',
+          message: '检测到您的 Ollama 翻译模式尚未配置（可能未选择模型）。点击“立即配置”以开启进阶能力。',
+          buttons: ['立即配置', '取消']
+        }).then(res => {
+          if (res === 0) {
+            // 如果点选了立即配置，则在当前位置拉起配置面版
+            if (!targetBackend) targetBackend = createOllamaBackend();
+            targetBackend.openConfigPanel(() => {
+              this.reloadFromAppConfig();
+            });
+          }
+        });
+      }
+    }
   }
 
   /**
