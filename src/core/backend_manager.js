@@ -261,37 +261,41 @@ class BackendManager {
     }
     
     // 3. 强力清理
-    const containerIds = [
-      'ollama-config-container', 
-      'dict-config-container', 
-      'libretranslate-config-container',
-      'proxy-config-container',
-      'ollama-advanced-panel-container'
-    ];
-    containerIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el) {
-        el.remove();
-        // 强制重置高度以处理点击外部或由于 uTools 会话管理导致的残留高度问题
-        if (!isSilent && typeof utools !== 'undefined') utools.setExpendHeight(0);
-      }
-    });
+    if (typeof document !== 'undefined') {
+      const containerIds = [
+        'ollama-config-container', 
+        'dict-config-container', 
+        'libretranslate-config-container',
+        'proxy-config-container',
+        'ollama-advanced-panel-container'
+      ];
+      containerIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.remove();
+          // 强制重置高度以处理点击外部或由于 uTools 会话管理导致的残留高度问题
+          if (!isSilent && typeof utools !== 'undefined') utools.setExpendHeight(0);
+        }
+      });
+    }
 
     // 4. 清理全局 API 钩子
-    delete window._ollamaAPI;
-    delete window._dictAPI;
-    delete window._libreAPI;
-    delete window._advancedAPI;
-    
-    // 5. 清理旧式钩子
-    if (typeof window.hideOllamaConfig === 'function') window.hideOllamaConfig();
-    if (typeof window.hideProxyConfig === 'function') window.hideProxyConfig();
+    if (typeof window !== 'undefined') {
+      delete window._ollamaAPI;
+      delete window._dictAPI;
+      delete window._libreAPI;
+      delete window._advancedAPI;
+      
+      // 5. 清理旧式钩子
+      if (typeof window.hideOllamaConfig === 'function') window.hideOllamaConfig();
+      if (typeof window.hideProxyConfig === 'function') window.hideProxyConfig();
 
-    // 6. 这里的 _closeConfigPanel 由外部注入
-    if (typeof window._closeConfigPanel === 'function') {
-        const temp = window._closeConfigPanel;
-        delete window._closeConfigPanel;
-        temp(isSilent);
+      // 6. 这里的 _closeConfigPanel 由外部注入
+      if (typeof window._closeConfigPanel === 'function') {
+          const temp = window._closeConfigPanel;
+          delete window._closeConfigPanel;
+          temp(isSilent);
+      }
     }
   }
 

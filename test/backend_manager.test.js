@@ -100,11 +100,11 @@ describe('BackendManager', () => {
     
     it('should return correct backend name', () => {
       BackendManager.init(mockConfig);
-      assert.strictEqual(BackendManager.getBackendName(), '词典查询时延');
+      assert.strictEqual(BackendManager.getBackendName(), '本地词典');
       
       mockConfig.backends.ollama = true;
       BackendManager.init(mockConfig);
-      assert.strictEqual(BackendManager.getBackendName(), 'Ollama 查询时延');
+      assert.strictEqual(BackendManager.getBackendName(), 'Ollama');
 
     });
   });

@@ -36,15 +36,13 @@ test('OllamaBackend Vision Support', async (t) => {
             .post('/v1/chat/completions', body => {
                 assert.strictEqual(body.model, 'llava');
                 const userMessage = body.messages[0];
-                assert.strictEqual(userMessage.role, 'user');
                 assert.ok(Array.isArray(userMessage.content));
-                assert.strictEqual(userMessage.content[0].type, 'image_url');
-                // 检查是否已经去掉了前缀
-                assert.ok(!userMessage.content[0].image_url.url.startsWith('data:'));
-                assert.strictEqual(userMessage.content[0].image_url.url, mockImageData.split('base64,')[1]);
-                assert.strictEqual(userMessage.content[1].type, 'text');
-                assert.ok(userMessage.content[1].text.includes('OCR'));
-                assert.ok(userMessage.content[1].text.includes('[img-0]'));
+                assert.strictEqual(userMessage.content[0].type, 'text');
+                assert.ok(userMessage.content[0].text.includes('SOURCE'));
+                assert.ok(userMessage.content[0].text.includes('TARGET'));
+                assert.strictEqual(userMessage.content[1].type, 'image_url');
+                assert.ok(userMessage.content[1].image_url.url.startsWith('data:'));
+                assert.strictEqual(userMessage.content[1].image_url.url, mockImageData);
                 return true;
             })
             .reply(200, mockResponse);

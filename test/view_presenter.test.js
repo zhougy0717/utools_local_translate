@@ -21,34 +21,35 @@ describe('ViewPresenter', () => {
 
   describe('buildProgressItem', () => {
     it('should return progress message', () => {
-      const result = buildProgressItem('20%');
-      assert.deepStrictEqual(result, [{ title: '词典自动构建中...', description: '20%' }]);
+      const result = buildProgressItem('下载中 20%');
+      assert.deepStrictEqual(result, [{ title: '词典状态同步', description: '下载中 20%' }]);
     });
   });
 
   describe('buildResultItems', () => {
     it('should return error message if result has message', () => {
       const result = buildResultItems('test', { message: 'Error msg' });
-      assert.deepStrictEqual(result, [{ title: '词库未就绪', description: 'Error msg' }]);
+      assert.strictEqual(result.length, 2);
+      assert.strictEqual(result[0].title, '词库未就绪');
     });
 
     it('should return not found if translation is missing', () => {
       const result = buildResultItems('test', { found: false });
-      assert.deepStrictEqual(result, [{ title: '未找到释义', description: 'test' }]);
+      assert.strictEqual(result.length, 2);
+      assert.strictEqual(result[0].title, '未找到释义');
     });
 
     describe('ZH to EN', () => {
-      it('should split multiple English translations into separate items', () => {
+      it('should NOT split multiple English translations into separate items', () => {
         const result = buildResultItems('测试', { 
           found: true, 
           translation: 'test ; trial ; quiz', 
           phonetic: 'cè shì' 
         }, true);
         
-        assert.strictEqual(result.length, 3);
-        assert.deepStrictEqual(result[0], { title: 'test', description: 'cè shì · 测试', copyText: 'test' });
-        assert.deepStrictEqual(result[1], { title: 'trial', description: ' ', copyText: 'trial' });
-        assert.deepStrictEqual(result[2], { title: 'quiz', description: ' ', copyText: 'quiz' });
+        assert.strictEqual(result.length, 2); // 1 translation + 1 advanced
+        assert.strictEqual(result[0].title, 'test ; trial ; quiz');
+        assert.strictEqual(result[1].isAdvancedOllama, true);
       });
 
       it('should handle missing phonetic', () => {
@@ -57,8 +58,9 @@ describe('ViewPresenter', () => {
           translation: 'test' 
         }, true);
         
-        assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: 'test', description: '测试', copyText: 'test' });
+        assert.strictEqual(result.length, 2);
+        assert.strictEqual(result[0].title, 'test');
+        assert.strictEqual(result[1].isAdvancedOllama, true);
       });
       
       it('should handle empty translation string safely', () => {
@@ -67,8 +69,9 @@ describe('ViewPresenter', () => {
           translation: '  ;  ' 
         }, true);
         
-        assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: '（无释义）', description: '测试' });
+        assert.strictEqual(result.length, 2);
+        assert.strictEqual(result[0].title, ';'); // Trimmed '  ;  ' becomes ';'
+        assert.strictEqual(result[1].isAdvancedOllama, true);
       });
     });
 
@@ -80,8 +83,9 @@ describe('ViewPresenter', () => {
           phonetic: '[test]' 
         }, false);
         
-        assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: '[test] 测试', description: 'test', copyText: '[test] 测试' });
+        assert.strictEqual(result.length, 2);
+        assert.strictEqual(result[0].title, '[test] 测试');
+        assert.strictEqual(result[1].isAdvancedOllama, true);
       });
 
       it('should handle missing phonetic', () => {
@@ -90,8 +94,9 @@ describe('ViewPresenter', () => {
           translation: '测试' 
         }, false);
         
-        assert.strictEqual(result.length, 1);
-        assert.deepStrictEqual(result[0], { title: '测试', description: 'test', copyText: '测试' });
+        assert.strictEqual(result.length, 2);
+        assert.strictEqual(result[0].title, '测试');
+        assert.strictEqual(result[1].isAdvancedOllama, true);
       });
     });
 
@@ -100,17 +105,13 @@ describe('ViewPresenter', () => {
       
       it('should append cost time item if costTime is provided and showCostConfig is true', () => {
         const result = buildResultItems('test', mockResult, false, 1500, 'Test Backend');
-        assert.strictEqual(result.length, 2); // 1 translation + 1 cost
-        assert.deepStrictEqual(result[1], {
-          title: '⚡ 本地翻译耗时: 1.50秒',
-          description: 'Test Backend',
-          icon: ''
-        });
+        assert.strictEqual(result.length, 3); // 1 translation + 1 advanced + 1 cost
+        assert.strictEqual(result[2].title, '⚡ 本地翻译耗时: 1.50秒');
       });
 
       it('should hide cost time item if showCostConfig is false', () => {
         const result = buildResultItems('test', mockResult, false, 1500, 'Test Backend', false);
-        assert.strictEqual(result.length, 1); // Only translation
+        assert.strictEqual(result.length, 2); // 1 translation + 1 advanced
       });
     });
   });

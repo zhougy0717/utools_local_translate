@@ -1,7 +1,8 @@
+const { describe, it, test, beforeEach, afterEach } = require('node:test');
 /**
  * BackendRegistry 测试
  */
-const { BackendRegistry } = require('../../src/backends/registry');
+const { BackendRegistry } = require('../src/backends/registry');
 
 describe('BackendRegistry', () => {
   let registry;

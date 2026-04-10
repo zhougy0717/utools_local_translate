@@ -524,5 +524,7 @@ function createDictBackend(options) {
 module.exports = {
   createDictBackend,
   getDictStatus,
+  downloadDicts,
+  downloadDictsFromGitee,
   DICT_STATUS
 };

@@ -1,3 +1,4 @@
+const { describe, it, test, beforeEach, afterEach } = require('node:test');
 const assert = require('assert');
 const ollamaCommand = require('../src/commands/ollama.js');
 
