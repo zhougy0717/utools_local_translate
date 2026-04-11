@@ -100,7 +100,7 @@ module.exports = {
                 } else {
                     statusText = '未配置 API 地址或模型';
                 }
-                icon = Icons.OLLAMA;
+                icon = 'icons/ollama.png';
             } else if (mode.id === 'libretranslate') {
                 const libreInfo = getLibreStatus(appConfig);
                 currentStatus = libreInfo.status;
@@ -185,7 +185,7 @@ module.exports = {
                     commandTrigger: 'mode',
                     modeId: 'ollama',
                     action: 'confirm_ollama',
-                    icon: Icons.OLLAMA
+                    icon: 'icons/ollama.png'
                 },
                 {
                     title: '打开 Ollama 配置面板',
@@ -194,7 +194,7 @@ module.exports = {
                     commandTrigger: 'mode',
                     modeId: 'ollama',
                     action: 'open_ollama_config',
-                    icon: Icons.OLLAMA
+                    icon: 'icons/ollama.png'
                 }
             ]);
             return { disableClear: true };

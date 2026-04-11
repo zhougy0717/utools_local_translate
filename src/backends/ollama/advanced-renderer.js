@@ -63,19 +63,19 @@ function switchTask(task) {
     UI.langSelectGroup.style.display = 'none';
     UI.ocrPreviewPane.style.display = 'none';
     UI.promptPane.style.display = 'flex';
-    UI.btnExecute.textContent = '执行命名';
+    UI.btnExecute.textContent = '生成变量命名';
   } else if (task === 'ocr') {
     UI.resultLabel.textContent = '图片翻译结果';
     UI.resultText.style.display = 'block';
     UI.namingResults.style.display = 'none';
-    UI.langSelectGroup.style.display = 'inline';
+    UI.langSelectGroup.style.display = 'flex';
     UI.ocrPreviewPane.style.display = 'flex';
     UI.promptPane.style.display = 'none';
-    UI.btnExecute.textContent = '执行识图并翻译';
+    UI.btnExecute.textContent = '识图翻译';
     UI.sourceInput.placeholder = 'AI 识别出的原文将在此处呈现，您可以进行微调以精修译文...';
     
     // 动态更新模型选择逻辑
-    UI.modelSelectLabel.textContent = '图片翻译模型:';
+    UI.modelSelectLabel.textContent = '识图模型:';
     const config = Bridge.loadConfig();
     UI.modelSelect.value = config.visionModel || config.model; // 优先使用 visionModel
     
@@ -84,10 +84,10 @@ function switchTask(task) {
     UI.resultLabel.textContent = '翻译结果';
     UI.resultText.style.display = 'block';
     UI.namingResults.style.display = 'none';
-    UI.langSelectGroup.style.display = 'inline';
+    UI.langSelectGroup.style.display = 'flex';
     UI.ocrPreviewPane.style.display = 'none';
     UI.promptPane.style.display = 'flex';
-    UI.btnExecute.textContent = '执行翻译';
+    UI.btnExecute.textContent = '立即翻译';
     
     // 恢复为文本模型选择
     UI.modelSelectLabel.textContent = '使用模型:';

@@ -34,16 +34,20 @@
 
     .brand { font-weight: 600; color: #1e293b; font-size: 15px; }
 
-    .controls { display: flex; gap: 8px; align-items: center; }
-    .control-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .controls { display: flex; gap: 16px; align-items: center; }
+    .control-item { display: flex; align-items: center; gap: 6px; }
+    .control-label { font-size: 12px; color: var(--text-muted); font-weight: 500; white-space: nowrap; }
 
     select {
-      background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px 8px; font-size: 13px; color: #64748b; outline: none;
+      height: 30px; box-sizing: border-box;
+      background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0 8px; font-size: 13px; color: #64748b; outline: none;
     }
 
     .btn-execute {
+      height: 30px; box-sizing: border-box;
       background: var(--accent-color); color: white; border: none; border-radius: 4px; 
-      padding: 6px 14px; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity 0.2s;
+      padding: 0 16px; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity 0.2s;
+      display: flex; align-items: center; justify-content: center; white-space: nowrap;
     }
     .btn-execute:hover { opacity: 0.9; }
     .btn-execute:disabled { background: #94a3b8; cursor: not-allowed; }
@@ -134,7 +138,7 @@
     <header class="toolbar">
       <div class="brand">Ollama 进阶翻译中心</div>
       <div class="controls">
-        <span id="lang-select-group">
+        <div id="lang-select-group" class="control-item">
           <span class="control-label">目标语言:</span>
           <select id="lang-select">
             <option value="auto">自动检测</option>
@@ -142,12 +146,14 @@
             <option value="en">English</option>
             <option value="ja">日本語</option>
           </select>
-        </span>
+        </div>
+        <div class="control-item">
           <span class="control-label" id="model-select-label">使用模型:</span>
-        <select id="model-select">
-          <option value="">正在获取模型...</option>
-        </select>
-        <button class="btn-execute" id="btn-execute">执行翻译</button>
+          <select id="model-select">
+            <option value="">正在获取模型...</option>
+          </select>
+        </div>
+        <button class="btn-execute" id="btn-execute">立即翻译</button>
         <span class="btn-config" id="btn-config" title="配置 Ollama">⚙️</span>
       </div>
     </header>

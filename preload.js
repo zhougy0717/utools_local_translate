@@ -104,13 +104,15 @@ if (typeof window !== 'undefined') {
             const { target } = UtoolsHelper.detectLanguages(''); // 默认目标
 
             _preprocessImage(action.payload).then(processedPayload => {
+                const startTime = Date.now();
                 BackendManager.queryImage(processedPayload, target, (err, result) => {
+                    const costMs = Date.now() - startTime;
                     if (err) {
-                        callbackSetList(ViewPresenter.buildResultItems('图片翻译失败', { found: false, translation: '识别过程出错: ' + err.message }, false, 0, BackendManager.getBackendName(), false));
+                        callbackSetList(ViewPresenter.buildResultItems('图片翻译失败', { found: false, translation: '识别过程出错: ' + err.message }, false, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
                         return;
                     }
                     // [VITAL FIX] 必须传递 processedPayload，否则后续进阶中心无法通过 ocrImage 获取图源
-                    callbackSetList(ViewPresenter.buildResultItems('图片翻译', result || { found: false }, false, 0, BackendManager.getBackendName(), false, processedPayload));
+                    callbackSetList(ViewPresenter.buildResultItems('图片翻译', result || { found: false }, false, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost(), processedPayload));
                 }, (progressMsg) => {
                     callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
                 });
