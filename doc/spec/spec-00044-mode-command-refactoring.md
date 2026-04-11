@@ -151,7 +151,7 @@ handleSelect(itemData, appConfig, callbackSetList) {
 
 1. **入参上下文无损透传**：`mode.js` 仅仅是转移了执行发生的作用域。原始传入的 `(itemData, appConfig, callbackSetList)` 三大件参数完全透明地被传入子 Handler 中，使得由于嵌套引发的下一级菜单回调功能（如 Ollama 的"确认启用" / "配置面板"菜单）依然后向兼容。
 2. **通信契约(Signal)对齐**：顶层的 `preload.js` 仅校验返回的纯数据指令（即 `{ disableClear: true }`, `{ reloadBackend: true, restoreSearch: true }`, 等）。这要求各个提取出来的子模块中 `handleSelect` 函数末尾，**必须原样返回与老代码一样的 Signal 载荷**。只要返回的对象的结构一致，系统的响应表现就是无缝等价的。
-3. **状态修改合并归心**：曾经的老代码里，散落着十几处繁杂的 `appConfig.backends.xyz = true; utools.dbStorage.setItem('app_config')`。在拆分后，由于 `appConfig` 对象通过引用传递各个模块，各 Handler 依旧拥有原先**原地修改配置值**的权利。最后统一由上层 `mode.js` 在函数终了前检查 Signal 是否需要保存，统一安全调用 `utools.dbStorage.setItem` 做收尾，杜绝忘写、漏写的情况。
+3. **状态修改合并归心与互斥保障**：曾经的老代码里，散落着十几处繁杂的相互剥夺活跃权的冗余代码（如 `appConfig.backends.offline_dict = false; appConfig.backends.ollama = true;` 等）。重构中我们将在 `mode.js` 或公共层抽离出一个互斥激活工具函数（如 `setActiveMode(appConfig, targetModeId)`），确保某一个后端被激活时，其他挂载的后端会自动被安全剥夺激活权（置为 `false`）。同时，底层不再零散调用 `utools.dbStorage.setItem`，而是统一交由上层 `mode.js` 在函数流转结束前根据 Signal 来统一落盘，杜绝忘写、漏写与数据覆盖冲突。
 4. **自动备用容灾处理 (Fallback Bypass)**：对于当引擎未处于 `READY` 强制跳转至 Config 页面的降级功能，会在抽离各模块时予以严格复刻。不论是通过共用的 Helper 处理还是被各 `Handler` 分别纳入，都能确信不可用节点同样无法触发导致异常的 `confirm_` 行动。
 
 ## 4. 验收与测试
