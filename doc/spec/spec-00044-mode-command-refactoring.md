@@ -74,7 +74,22 @@ package "src/commands" {
 @enduml
 ```
 
-### 2.3 mode.js (Router) 的 `handleSelect` 拆分设计
+### 2.3 子模块 Handler 拆分详单
+从旧的 `mode.js` 中彻底剥离并原子化独立出的新模块及其核心职责清单如下：
+
+- **`src/commands/modes/offline_dict.js`**
+  - **状态承接**：封装原 `getDictStatus` 等效逻辑，负责向用户呈现离线词典本地引擎是否已就绪。
+  - **动作兜底**：全权处理二级动作 `confirm_dict` 与 `open_dict_config`。
+
+- **`src/commands/modes/ollama.js`**
+  - **状态承接**：封装原 `getOllamaStatus` 等效逻辑，通过 `OllamaConfig` 判断模型和本地服务是否配置健康。
+  - **动作兜底**：全权处理二级动作 `confirm_ollama` 与 `open_ollama_config`。
+
+- **`src/commands/modes/libretranslate.js`**
+  - **状态承接**：封装原 `getLibreStatus` 等效代码。
+  - **动作兜底**：全权处理二级动作 `confirm_libre`、`open_libre_config`，以及原老代码中的外链文档跳转 `open_libre_docs` 动作。
+
+### 2.4 mode.js (Router) 的 `handleSelect` 拆分设计
 `mode.js` 将由原本承担所有底层状态判断与子级动作匹配的角色，退化为单纯的“中转路由”。
 
 #### 动态流转设计 (Activity Flow)
@@ -98,11 +113,10 @@ if (校验 handlerMap[itemData.modeId]) then (匹配至对应 Handler)
       :构造二级导航选项 (确认/配置);
       :返回 Signal { disableClear: true };
     else (包含 action)
+      :设置该 mode 为 true
       if (处于 Fallback(未就绪)或要求配置?) then (yes)
-        :设置该 mode 为 true 活跃;
         :返回 { openConfigPanel: true, reloadBackend: true };
       else (常规确认切换)
-        :设置该 mode 为 true，剥夺其他 mode 活跃;
         :返回 { reloadBackend: true, restoreSearch: true };
       endif
     endif
