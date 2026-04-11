@@ -111,7 +111,7 @@ module.exports = {
                 } else {
                     statusText = '未配置服务地址';
                 }
-                icon = Icons.LIBRE;
+                icon = 'icons/libretranslate.png';
             }
 
             // 检查当前是否激活
@@ -214,7 +214,7 @@ module.exports = {
                     commandTrigger: 'mode',
                     modeId: 'libretranslate',
                     action: 'confirm_libre',
-                    icon: Icons.LIBRE
+                    icon: 'icons/libretranslate.png'
                 },
                 {
                     title: '打开 LibreTranslate 配置面板',
@@ -223,7 +223,7 @@ module.exports = {
                     commandTrigger: 'mode',
                     modeId: 'libretranslate',
                     action: 'open_libre_config',
-                    icon: Icons.LIBRE
+                    icon: 'icons/libretranslate.png'
                 }
             ]);
             return { disableClear: true };
