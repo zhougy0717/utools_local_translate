@@ -75,11 +75,57 @@ package "src/commands" {
 ```
 
 ### 2.3 mode.js (Router) 的 `handleSelect` 拆分设计
-`mode.js` 将由原本承担所有底层逻辑的角色，退化为单纯的“中转路由”。
+`mode.js` 将由原本承担所有底层状态判断与子级动作匹配的角色，退化为单纯的“中转路由”。
 
-在重构后的 `mode.js` 中，`handleSelect` 将只做两件事：
+#### 动态流转设计 (Activity Flow)
+结合前一节类图表述的静态架构，下列活动图展示了重构后 `handleSelect` 的动态流转机制。主路由通过配置字典匹配定位策略实例，实现请求的透明转发以及收尾时的统一落盘动作。
+
+```plantuml
+@startuml
+skinparam handwritten false
+skinparam monochrome true
+skinparam DefaultFontName sans-serif
+
+start
+:用户在 UI 中发起操作;
+:preload 调用 ModeCommand.handleSelect;
+
+if (校验 handlerMap[itemData.modeId]) then (匹配至对应 Handler)
+  partition "具体业务委托层 (Handler 层)" {
+    :调用 handler.handleSelect(...);
+    
+    if (是否带有二级 action ?) then (无 action: 首次点击)
+      :构造二级导航选项 (确认/配置);
+      :返回 Signal { disableClear: true };
+    else (包含 action)
+      if (处于 Fallback(未就绪)或要求配置?) then (yes)
+        :设置该 mode 为 true 活跃;
+        :返回 { openConfigPanel: true, reloadBackend: true };
+      else (常规确认切换)
+        :设置该 mode 为 true，剥夺其他 mode 活跃;
+        :返回 { reloadBackend: true, restoreSearch: true };
+      endif
+    endif
+  }
+
+  partition "中央调度收尾层 (Router)" {
+    if (Signal 要求跳出菜单，即 !signal.disableClear ?) then (yes)
+      :调用 dbStorage 统一持久化上述 Handler 更改的配置;
+    else (no)
+    endif
+  }
+
+  :将终态 Signal 返还给宿主;
+else (无匹配)
+  :返回 {};
+endif
+stop
+@enduml
+```
+
+在重构后的代码层级上，`handleSelect` 退化为简练的结构：
 1. **依据 `modeId` 路由查找**：从传入的 `itemData.modeId` 匹配出已注册的 Handler 对象。
-2. **底层职责委派**：调用 `handler.handleSelect(...)`，将业务逻辑需要的全部上下文（用户点击数据、应用配置、底层回调列表）转交。
+2. **底层职责委派**：调用 `handler.handleSelect(...)`，转交上下文。
 
 ```javascript
 // 重构后的 mode.js 的 handleSelect 结构示意：
