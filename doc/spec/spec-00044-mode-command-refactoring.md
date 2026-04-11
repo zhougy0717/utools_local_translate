@@ -74,18 +74,39 @@ package "src/commands" {
 @enduml
 ```
 
-### 2.3 mode.js (Router) 重构
-`mode.js` 的主要职责变化：
-- **状态聚合**：在 `handleSearch` 中遍历所有 registered handlers 获取对应的 `getSearchItemData` 返回值，拼接出展示列表进行统一回调。
-- **操作分发**：在 `handleSelect` 中提取出 `itemData.modeId`，转发给对应的 handler。
-- 代码缩减：由于各类底层指令（如 `action: 'confirm_dict'`、状态常量等）都被移入对应的 handler 文件，`mode.js` 能够做到与具体的翻译服务解耦，新增后端不再需要改动 router（仅需在 handler 数组挂载即可）。
+### 2.3 mode.js (Router) 的 `handleSelect` 拆分设计
+`mode.js` 将由原本承担所有底层逻辑的角色，退化为单纯的“中转路由”。
 
-## 3. 具体执行步骤与兼容性处理
+在重构后的 `mode.js` 中，`handleSelect` 将只做两件事：
+1. **依据 `modeId` 路由查找**：从传入的 `itemData.modeId` 匹配出已注册的 Handler 对象。
+2. **底层职责委派**：调用 `handler.handleSelect(...)`，将业务逻辑需要的全部上下文（用户点击数据、应用配置、底层回调列表）转交。
 
-1. **分离线下逻辑**：将 `getDictStatus`, `getOllamaStatus`, `getLibreStatus` 等助手函数移动至对应 `modes/` 内的文件。
-2. **提取业务方法**：依据旧版 `handleSelect` 将二级确认菜单及配置项保存的具体指令下沉并映射到 `handleSelect(itemData, ...)` 内部。
-3. **副作用契约无缝对接**：由于 `Signal` (如 `{ reloadBackend: true, restoreSearch: true }` )机制未改变，且全局持久化 (uTools dbStorage 保存 `appConfig`) 的流程依然有效，渲染层的感知行为与改版前保持完全一致。
-4. **清理遗留导入**：清理原先文件头部的多余 Import。
+```javascript
+// 重构后的 mode.js 的 handleSelect 结构示意：
+handleSelect(itemData, appConfig, callbackSetList) {
+    const handler = handlerMap[itemData.modeId];
+    if (handler) {
+        // 1. 将多级逻辑控制权原封不动转交给对应后端
+        const signal = handler.handleSelect(itemData, appConfig, callbackSetList);
+        
+        // 2. 统一保存应用级配置修改 (防止重构产生漏写)
+        if (typeof utools !== 'undefined' && signal && !signal.disableClear) {
+            utools.dbStorage.setItem('app_config', appConfig);
+        }
+        return signal;
+    }
+    return {};
+}
+```
+
+## 3. 拆分稳定性与防退化保证 (Regression Safety)
+
+这是一次纯粹的系统内置逻辑解耦重构，为确保对 uTools 宿主及最终用户的交互体验 **零影响 (无副作用)**，我们将实施以下契约保障：
+
+1. **入参上下文无损透传**：`mode.js` 仅仅是转移了执行发生的作用域。原始传入的 `(itemData, appConfig, callbackSetList)` 三大件参数完全透明地被传入子 Handler 中，使得由于嵌套引发的下一级菜单回调功能（如 Ollama 的"确认启用" / "配置面板"菜单）依然后向兼容。
+2. **通信契约(Signal)对齐**：顶层的 `preload.js` 仅校验返回的纯数据指令（即 `{ disableClear: true }`, `{ reloadBackend: true, restoreSearch: true }`, 等）。这要求各个提取出来的子模块中 `handleSelect` 函数末尾，**必须原样返回与老代码一样的 Signal 载荷**。只要返回的对象的结构一致，系统的响应表现就是无缝等价的。
+3. **状态修改合并归心**：曾经的老代码里，散落着十几处繁杂的 `appConfig.backends.xyz = true; utools.dbStorage.setItem('app_config')`。在拆分后，由于 `appConfig` 对象通过引用传递各个模块，各 Handler 依旧拥有原先**原地修改配置值**的权利。最后统一由上层 `mode.js` 在函数终了前检查 Signal 是否需要保存，统一安全调用 `utools.dbStorage.setItem` 做收尾，杜绝忘写、漏写的情况。
+4. **自动备用容灾处理 (Fallback Bypass)**：对于当引擎未处于 `READY` 强制跳转至 Config 页面的降级功能，会在抽离各模块时予以严格复刻。不论是通过共用的 Helper 处理还是被各 `Handler` 分别纳入，都能确信不可用节点同样无法触发导致异常的 `confirm_` 行动。
 
 ## 4. 验收与测试
 - **白盒断言**：确认 `src/commands/mode.js` 行数大幅缩减且不存在任何硬编码后端识别 `if(modeId === '...')`。
