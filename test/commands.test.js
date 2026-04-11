@@ -8,7 +8,7 @@ describe('Slash Command Manager', () => {
         CommandManager.handleSearch('/', (list) => {
             assert.strictEqual(list.length, 2);
             assert.strictEqual(list[0].trigger, 'mode');
-            assert.strictEqual(list[1].trigger, 'libre');
+            assert.strictEqual(list[1].trigger, 'help');
             assert.strictEqual(list[0].isRootCommand, true);
             done();
         });
@@ -22,10 +22,10 @@ describe('Slash Command Manager', () => {
         });
     });
 
-    it('handleSearch with "/l" should filter root commands', (t, done) => {
-        CommandManager.handleSearch('/l', (list) => {
+    it('handleSearch with "/h" should find help command', (t, done) => {
+        CommandManager.handleSearch('/h', (list) => {
             assert.strictEqual(list.length, 1);
-            assert.strictEqual(list[0].trigger, 'libre');
+            assert.strictEqual(list[0].trigger, 'help');
             done();
         });
     });

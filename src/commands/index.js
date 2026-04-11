@@ -1,10 +1,10 @@
 const modeCommand = require('./mode.js');
-const libreCommand = require('./libre.js');
+const helpCommand = require('./help.js');
 
 // 注册激活的所有命令
 const COMMANDS = [
     modeCommand,
-    libreCommand
+    helpCommand
 ];
 
 const Icons = require('./icons.js');
