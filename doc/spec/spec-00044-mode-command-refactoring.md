@@ -23,30 +23,55 @@ src/commands/
 ### 2.2 IModeHandler 接口定义
 每一个在 `modes` 目录下的 handler 都需要遵守并暴露以下的标准接口契约：
 
-```javascript
-module.exports = {
-    // 基础元信息
-    id: '...',        
-    title: '...',
-    description: '...',
-    icon: '...',
-    
-    /**
-     * 生成第一层菜单状态数据
-     * @param {Object} appConfig 全局配置 
-     * @returns {Object} 针对单个后端的列表选项对象数据 (包括 status, text, prefix 等)
-     */
-    getSearchItemData: function(appConfig) { ... },
+```plantuml
+@startuml
+skinparam handwritten false
+skinparam monochrome true
+skinparam DefaultFontName sans-serif
 
-    /**
-     * 消费属于当前 modeId 的所有二级/底层操作
-     * @param {Object} itemData 用户点击的数据体
-     * @param {Object} appConfig 全局配置 
-     * @param {Function} callbackSetList uTools列表回调
-     * @returns {Object} Signal 指令
-     */
-    handleSelect: function(itemData, appConfig, callbackSetList) { ... }
-};
+package "src/commands" {
+  class ModeCommand <<Router>> {
+    - handlers: Map<String, IModeHandler>
+    + trigger: "mode"
+    + handleSearch(subInput, callbackSetList, appConfig)
+    + handleSelect(itemData, appConfig, callbackSetList): Signal
+  }
+
+  interface IModeHandler {
+    + id: String
+    + title: String
+    + description: String
+    + icon: String
+    + getSearchItemData(appConfig): Object
+    + handleSelect(itemData, appConfig, callbackSetList): Signal
+  }
+
+  package "modes" {
+    class OfflineDictHandler {
+      + id = "offline_dict"
+      + getSearchItemData(appConfig)
+      + handleSelect(itemData, appConfig, callbackSetList)
+    }
+
+    class OllamaHandler {
+      + id = "ollama"
+      + getSearchItemData(appConfig)
+      + handleSelect(itemData, appConfig, callbackSetList)
+    }
+
+    class LibreTranslateHandler {
+      + id = "libretranslate"
+      + getSearchItemData(appConfig)
+      + handleSelect(itemData, appConfig, callbackSetList)
+    }
+  }
+
+  ModeCommand o--> IModeHandler : "Routes exactly by modeId"
+  IModeHandler <|.. OfflineDictHandler : implements
+  IModeHandler <|.. OllamaHandler : implements
+  IModeHandler <|.. LibreTranslateHandler : implements
+}
+@enduml
 ```
 
 ### 2.3 mode.js (Router) 重构
