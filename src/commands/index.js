@@ -41,8 +41,8 @@ const CommandManager = {
 
             if (matched.length > 0) {
                 const listItems = matched.map(cmd => {
-                    const icon = cmd.trigger === 'libre' ? Icons.LIBRE : 
-                               cmd.trigger === 'target' ? Icons.LANG : Icons.MODE;
+                    const icon = cmd.trigger === 'target' ? Icons.LANG : 
+                               cmd.trigger === 'help' ? Icons.HELP : Icons.MODE;
                     return {
                         title: `/${cmd.trigger} ${cmd.title}`,
                         description: cmd.description,
