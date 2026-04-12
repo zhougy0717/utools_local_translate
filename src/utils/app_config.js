@@ -21,6 +21,9 @@ const APP_CONFIG_DEFAULTS = {
     offline_dict: true,
     ollama: false,
     libretranslate: false
+  },
+  translationLanguage: {
+    target: 'auto'
   }
 };
 
@@ -240,6 +243,23 @@ class AppConfig {
    */
   shouldShowTranslationCost() {
     return this.load().showTranslationCost !== false;
+  }
+
+  /**
+   * 获取目标语言设置
+   * @returns {string}
+   */
+  getTranslationTarget() {
+    return this.load().translationLanguage?.target || 'auto';
+  }
+
+  /**
+   * 设置目标语言
+   * @param {string} code - 语言代码
+   */
+  setTranslationTarget(code) {
+    const translationLanguage = Object.assign({}, this.load().translationLanguage || { target: 'auto' }, { target: code });
+    this.save({ translationLanguage });
   }
 }
 
