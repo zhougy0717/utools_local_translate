@@ -1,10 +1,12 @@
 const modeCommand = require('./mode.js');
 const helpCommand = require('./help.js');
+const targetCommand = require('./target.js');
 
 // 注册激活的所有命令
 const COMMANDS = [
     modeCommand,
-    helpCommand
+    helpCommand,
+    targetCommand
 ];
 
 const Icons = require('./icons.js');
@@ -21,26 +23,26 @@ function toBoldUnicode(str) {
 
 const CommandManager = {
     handleSearch(searchWord, callbackSetList, appConfig) {
-        const parts = searchWord.split(/\s+/);
-        const cmdToken = parts[0].toLowerCase();
+        const input = searchWord.toLowerCase();
 
-        // 1. 匹配具体的命令子集 (如完全命中了 '/mode' 模式)
+        // 1. 精确匹配指令路由 (如完全命中了 '/mode' 或以 '/mode ' 开头)
         for (const cmd of COMMANDS) {
-            const targetToken = `/${cmd.trigger.toLowerCase()}`;
-            if (cmdToken === targetToken) {
-                const subInput = searchWord.slice(targetToken.length).trim();
-                return cmd.handleSearch(subInput, callbackSetList, appConfig); // 交给具体命令接管渲染
+            const prefix = `/${cmd.trigger.toLowerCase()}`;
+            if (input === prefix || input.startsWith(prefix + ' ')) {
+                const subInput = searchWord.slice(prefix.length).trim();
+                return cmd.handleSearch(subInput, callbackSetList, appConfig);
             }
         }
 
-        // 2. 处于根级斜线页面，或部分匹配，模糊展示命令列表
-        const inputCmd = cmdToken.slice(1).trim();
+        // 2. 处于根级斜线页面，模糊匹配匹配命令列表 (如针对 '/')
+        const inputToken = searchWord.trim().toLowerCase();
+        const inputCmd = inputToken.startsWith('/') ? inputToken.slice(1) : '';
         const matchedCommands = COMMANDS.filter(cmd => cmd.trigger.startsWith(inputCmd));
 
         if (matchedCommands.length > 0) {
             const listItems = matchedCommands.map(cmd => {
-                let icon = Icons.MODE;
-                if (cmd.trigger === 'libre') icon = Icons.LIBRE;
+                const icon = cmd.trigger === 'libre' ? Icons.LIBRE : 
+                           cmd.trigger === 'target' ? Icons.LANG : Icons.MODE;
                 
                 const boldTrigger = toBoldUnicode(`/${cmd.trigger}`);
                 
@@ -64,9 +66,15 @@ const CommandManager = {
     handleSelect(itemData, appConfig, callbackSetList) {
         if (!itemData.isCommandContext) return {};
 
-        // 处理一级列表的点击事件，主动帮用户补全文字
+        // 核心改动：点击一级列表时不补全输入框内容，而是直接通过回调刷新列表项
         if (itemData.isRootCommand) {
-            return { autoComplete: `/${itemData.trigger} ` };
+            const targetCmd = COMMANDS.find(c => c.trigger === itemData.trigger);
+            if (targetCmd) {
+                // 主动触发搜索逻辑，并直接利用 callbackSetList 渲染出二级菜单
+                targetCmd.handleSearch('', callbackSetList, appConfig);
+            }
+            // 返回空信号，不让 uTools 更改输入框内容
+            return {};
         }
 
         // 将具体的二级菜单选中转发给特定的命令模块处理

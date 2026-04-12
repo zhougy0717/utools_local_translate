@@ -48,7 +48,7 @@ class OllamaHandler {
 
         return {
             title: `${this.title}${activeSuffix}`,
-            description: `${statusPrefix} ${statusText} — ${this.description}`,
+            description: `${statusPrefix} ${statusText} — ${this.description} (/mode)`,
             isCommandContext: true,
             commandTrigger: 'mode',
             modeId: this.id,
