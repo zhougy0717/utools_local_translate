@@ -74,23 +74,15 @@ package "src/commands" {
 @enduml
 ```
 
-### 2.3 子模块 Handler 拆分详单
-从旧的 `mode.js` 中彻底剥离并原子化独立出的新模块及其核心职责清单如下：
+### 2.3 mode.js (Router) 的 `handleSelect` 拆分设计
 
-- **`src/commands/modes/offline_dict.js`**
-  - **状态承接**：封装原 `getDictStatus` 等效逻辑，负责向用户呈现离线词典本地引擎是否已就绪。
-  - **动作兜底**：全权处理二级动作 `confirm_dict` 与 `open_dict_config`。
+#### 子模块 Handler 拆分清单表
+在具体的设计流转中，从 `mode.js` 中抽出并原子化分工的子 Handler 包含了如下三个：
+- **`src/commands/modes/offline_dict.js`**: 承接离线词典的健康状态判定，处理动作 `confirm_dict` 与 `open_dict_config`。
+- **`src/commands/modes/ollama.js`**: 承接 Ollama 联通状态检查，处理动作 `confirm_ollama` 与 `open_ollama_config`。
+- **`src/commands/modes/libretranslate.js`**: 承接 Libre API 的状态检查，处理动作 `confirm_libre`、`open_libre_config` 以及跳转文档的 `open_libre_docs`。
 
-- **`src/commands/modes/ollama.js`**
-  - **状态承接**：封装原 `getOllamaStatus` 等效逻辑，通过 `OllamaConfig` 判断模型和本地服务是否配置健康。
-  - **动作兜底**：全权处理二级动作 `confirm_ollama` 与 `open_ollama_config`。
-
-- **`src/commands/modes/libretranslate.js`**
-  - **状态承接**：封装原 `getLibreStatus` 等效代码。
-  - **动作兜底**：全权处理二级动作 `confirm_libre`、`open_libre_config`，以及原老代码中的外链文档跳转 `open_libre_docs` 动作。
-
-### 2.4 mode.js (Router) 的 `handleSelect` 拆分设计
-`mode.js` 将由原本承担所有底层状态判断与子级动作匹配的角色，退化为单纯的“中转路由”。
+此时的 `mode.js` 将由原本承担所有底层状态判断与子级动作匹配的重度角色，退化为单纯的“中转路由”。
 
 #### 动态流转设计 (Activity Flow)
 结合前一节类图表述的静态架构，下列活动图展示了重构后 `handleSelect` 的动态流转机制。主路由通过配置字典匹配定位策略实例，实现请求的透明转发以及收尾时的统一落盘动作。
@@ -113,11 +105,11 @@ if (校验 handlerMap[itemData.modeId]) then (匹配至对应 Handler)
       :构造二级导航选项 (确认/配置);
       :返回 Signal { disableClear: true };
     else (包含 action)
-      :设置该 mode 为 true
+      :设置该 mode 为 true;
       if (处于 Fallback(未就绪)或要求配置?) then (yes)
-        :返回 { openConfigPanel: true, reloadBackend: true };
+        :返回 \nSignal {\n   openConfigPanel: true, \n   reloadBackend: true \n};
       else (常规确认切换)
-        :返回 { reloadBackend: true, restoreSearch: true };
+        :返回 \nSignal {\n   reloadBackend: true, \n    restoreSearch: true \n};
       endif
     endif
   }
