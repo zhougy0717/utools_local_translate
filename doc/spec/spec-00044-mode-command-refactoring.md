@@ -46,30 +46,21 @@ package "src/commands" {
     + handleSelect(itemData, appConfig, callbackSetList): Signal
   }
 
-  package "modes" {
-    class OfflineDictHandler {
-      + id = "offline_dict"
-      + getSearchItemData(appConfig)
-      + handleSelect(itemData, appConfig, callbackSetList)
-    }
-
-    class OllamaHandler {
-      + id = "ollama"
-      + getSearchItemData(appConfig)
-      + handleSelect(itemData, appConfig, callbackSetList)
-    }
-
-    class LibreTranslateHandler {
-      + id = "libretranslate"
-      + getSearchItemData(appConfig)
-      + handleSelect(itemData, appConfig, callbackSetList)
-    }
+  class Action {
+    + id: String
+    + execute(appConfig, itemData, callbackSetList): Signal
   }
 
-  ModeCommand o--> IModeHandler : "Routes exactly by modeId"
-  IModeHandler <|.. OfflineDictHandler : implements
-  IModeHandler <|.. OllamaHandler : implements
-  IModeHandler <|.. LibreTranslateHandler : implements
+  package "modes" {
+    class OfflineDictHandler {
+      - actions: Map<String, Action>
+      ...
+    }
+    ...
+  }
+
+  IModeHandler "1" *-- "many" Action : contains
+  ModeCommand o--> IModeHandler : "Routes by modeId"
 }
 @enduml
 ```
@@ -79,10 +70,41 @@ package "src/commands" {
 #### 子模块 Handler (策略实现) 拆分清单表
 在具体的设计流转中，从 `mode.js` 中抽出并原子化分工的子 Handler（严格对应上一节类图中的三个具体实现类）包含了：
 
-- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`): 承接状态判定，全权接管提取离线词典通过 `!itemData.action` 渲染的二级菜单逻辑及其关联的 `confirm_dict` 与 `open_dict_config` 动作。
-- **`OllamaHandler`** (`src/commands/modes/ollama.js`): 承接应用联通状态检查，全权接管提取 Ollama 首层点击时构建二级导航的逻辑及其关联的 `confirm_ollama` 与 `open_ollama_config` 动作。
-- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`): 承接 API 状态检查，全权接管提取 Libre 二级导航的构建逻辑及其关联的 `confirm_libre`、`open_libre_config` 与 `open_libre_docs` 动作。
+- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`): 承接状态判定，全权接管提取离线词典通过 `!itemData.action` 渲染的二级菜单逻辑及其关联的 **Action 列表**。
+- **`OllamaHandler`** (`src/commands/modes/ollama.js`): 承接应用联通状态检查，全权接管提取 Ollama 首层点击时构建二级导航的逻辑及其关联的 **Action 列表**。
+- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`): 承接 API 状态检查，全权接管提取 Libre 二级导航的构建逻辑及其关联的 **Action 列表**。
 
+### 2.4 各 Handler 职责剥离明细 (Action 映射表)
+为了确保重构不遗漏任何逻辑，下表列出了从原 `mode.js` 中剥离并封装进各 Handler 内部的 `Action` 对象：
+
+| 所属 Handler | 剥离的 Action ID | 业务逻辑描述 | 预期返回 Signal |
+| :--- | :--- | :--- | :--- |
+| **OfflineDictHandler** | `confirm_dict` | 激活离线词典模式，禁用其他后端 | `{ reloadBackend: true, restoreSearch: true }` |
+| | `open_dict_config` | 激活并跳转至词典管理/下载面板 | `{ openConfigPanel: true, reloadBackend: true }` |
+| **OllamaHandler** | `confirm_ollama` | 激活 Ollama 模式，禁用其他后端 | `{ reloadBackend: true, restoreSearch: true }` |
+| | `open_ollama_config` | 激活并跳转至 Ollama 配置面板 | `{ openConfigPanel: true, reloadBackend: true }` |
+| **LibreTranslateHandler** | `confirm_libre` | 激活 LibreTranslate 模式 | `{ reloadBackend: true, restoreSearch: true }` |
+| | `open_libre_config` | 激活并跳转至 Libre 配置面板 | `{ openConfigPanel: true, reloadBackend: true }` |
+| | `open_libre_docs` | 调起外部浏览器打开技术文档 | `{ restoreSearch: true }` |
+
+### 2.5 Action 类设计概念
+为了进一步规范代码，每个子 Handler 内部可以使用统一的 `Action` 结构或调度方式来消费事件：
+
+```javascript
+/**
+ * 形式化 Action 接口（逻辑概念）
+ * 在每个 handler 内部，我们将原先散落在 mode.js 中的 if-else 转化为 Action 字典映射
+ */
+const actions = {
+  'confirm_ollama': (appConfig) => {
+    setActiveMode(appConfig, 'ollama'); // 调用互斥工具函数
+    return { reloadBackend: true, restoreSearch: true };
+  },
+  // ... 其他 Action
+};
+```
+
+### 2.6 mode.js (Router) 重构后的动态流转
 此时的 `mode.js` 将由原本承担所有底层状态判断与子级动作匹配的重度角色，退化为单纯的“中转路由”。
 
 #### 动态流转设计 (Activity Flow)
@@ -109,8 +131,9 @@ if (校验 handlerMap[itemData.modeId]) then (匹配至对应 Handler)
       :设置该 mode 为 true;
       if (处于 Fallback(未就绪)或要求配置?) then (yes)
         :返回 \nSignal {\n   openConfigPanel: true, \n   reloadBackend: true \n};
-      else (常规确认切换)
-        :返回 \nSignal {\n   reloadBackend: true, \n    restoreSearch: true \n};
+      else (执行 Action.execute())
+        :查找并执行对应的 Action 逻辑;
+        :返回对应的业务 Signal;
       endif
     endif
   }
