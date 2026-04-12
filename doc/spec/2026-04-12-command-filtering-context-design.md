@@ -48,27 +48,32 @@
 
 ## 5. 交互时序图
 
-```mermaid
-sequenceDiagram
-    participant User as 用户 (uTools)
-    participant Preload as preload.js
-    participant CM as CommandManager
-    participant Cmd as 具体指令处理器
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
 
-    User->>Preload: 输入 "/t"
-    Preload->>CM: handleSearch("/t")
-    CM-->>User: 返回 [/target] 建议项
+actor "用户 (uTools)" as User
+participant "preload.js" as Preload
+participant "CommandManager" as CM
+participant "具体指令处理器" as Cmd
 
-    User->>Preload: 点击 [/target]
-    Preload->>CM: handleSelect(RootItem)
-    Note over CM: 锁定 activeCommand = TargetCommand
-    CM->>Cmd: handleSearch("")
-    Cmd-->>User: 立即渲染全量语言列表
+User -> Preload: 输入 "/t"
+Preload -> CM: use handleSearch("/t")
+CM -->> User: 建议项 [/target]
 
-    User->>Preload: 输入 "chi" (无需输入前缀)
-    Preload->>CM: handleSearch("chi") (因为有 Context)
-    CM->>Cmd: handleSearch("chi")
-    Cmd-->>User: 渲染过滤后的 "中文" 列表
+User -> Preload: select [/target]
+Preload -> CM: delegate handleSelect()
+note over CM: 锁定 Context: activeCommand = TargetCommand
+CM -> Cmd: handleSearch("")
+Cmd -->> User: 渲染全量语言列表
+
+User -> Preload: 输入 "chi" (无需输入前缀)
+note right of Preload: 检测到 hasContext() == true
+Preload -> CM: delegate handleSearch("chi")
+CM -> Cmd: use handleSearch("chi")
+Cmd -->> User: 渲染过滤后的 "中文" 列表
+@enduml
 ```
 
 ## 6. 测试要点
