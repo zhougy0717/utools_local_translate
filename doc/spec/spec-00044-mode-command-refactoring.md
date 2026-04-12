@@ -54,13 +54,20 @@ package "src/commands" {
   package "modes" {
     class OfflineDictHandler {
       - actions: Map<String, Action>
-      ...
     }
-    ...
+    class OllamaHandler {
+      - actions: Map<String, Action>
+    }
+    class LibreTranslateHandler {
+      - actions: Map<String, Action>
+    }
   }
 
-  IModeHandler "1" *-- "many" Action : contains
+  IModeHandler "1" *-- "*" Action : contains
   ModeCommand o--> IModeHandler : "Routes by modeId"
+  IModeHandler <|.. OfflineDictHandler : implements
+  IModeHandler <|.. OllamaHandler : implements
+  IModeHandler <|.. LibreTranslateHandler : implements
 }
 @enduml
 ```
