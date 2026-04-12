@@ -135,8 +135,13 @@ if (typeof window !== 'undefined') {
           ]);
         },
         search: function (action, searchWord, callbackSetList) {
-          // 在任何搜索或指令输入前，优先清理可能存在的配置面板 (静默模式)
-          BackendManager.closeCurrentConfigPanel(true);
+          // TODO: 这里的清理逻辑需要严格受控。
+          // 之前发现：如果在输入指令（如 /mo）的过程中频繁调用 closeCurrentConfigPanel(true)，
+          // 会因为 DOM 的频繁变动/移除操作干扰 uTools 列表引擎的渲染帧，导致命令列表项无法正常显示。
+          // 目前通过 !startsWith('/') 和 hasActivePanel() 进行了按需清理，确保了指令导航的稳定性。
+          if (!searchWord.startsWith('/') && BackendManager.hasActivePanel()) {
+            BackendManager.closeCurrentConfigPanel(true);
+          }
 
           if (searchTimeout) {
             clearTimeout(searchTimeout);

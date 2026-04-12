@@ -47,7 +47,7 @@ class OfflineDictHandler {
 
         return {
             title: `${this.title}${activeSuffix}`,
-            description: `${statusPrefix} ${statusText} — ${this.description} (/mode)`,
+            description: `${statusPrefix} ${statusText} — ${this.description}`,
             isCommandContext: true,
             commandTrigger: 'mode',
             modeId: this.id,

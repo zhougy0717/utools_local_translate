@@ -299,6 +299,23 @@ class BackendManager {
     }
   }
 
+  /**
+   * 检查当前是否有任何活跃的配置或进阶面板在显示
+   * @returns {boolean}
+   */
+  hasActivePanel() {
+    if (typeof document === 'undefined') return false;
+    const containerIds = [
+      'ollama-config-container', 
+      'dict-config-container', 
+      'libretranslate-config-container',
+      'proxy-config-container',
+      'ollama-advanced-panel-container'
+    ];
+    return containerIds.some(id => !!document.getElementById(id)) || 
+           (typeof window !== 'undefined' && !!window._closeConfigPanel);
+  }
+
   _stopCurrentWorker() {
     if (this.activeBackend && typeof this.activeBackend.stopWorker === 'function') {
       this.activeBackend.stopWorker();

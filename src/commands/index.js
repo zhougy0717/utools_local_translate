@@ -2,64 +2,66 @@ const modeCommand = require('./mode.js');
 const helpCommand = require('./help.js');
 const targetCommand = require('./target.js');
 
-// 注册激活的所有命令
+// 注册并规格化激活的所有命令，确保 trigger/title 等属性可被稳定探测
 const COMMANDS = [
     modeCommand,
     helpCommand,
     targetCommand
-];
+].map(cmd => ({
+    trigger: String(cmd.trigger || '').toLowerCase(),
+    title: String(cmd.title || ''),
+    description: String(cmd.description || ''),
+    handleSearch: cmd.handleSearch,
+    handleSelect: cmd.handleSelect
+}));
 
 const Icons = require('./icons.js');
 
-function toBoldUnicode(str) {
-    return str.split('').map(char => {
-        const code = char.charCodeAt(0);
-        if (code >= 65 && code <= 90) return String.fromCodePoint(0x1D400 + code - 65); // A-Z
-        if (code >= 97 && code <= 122) return String.fromCodePoint(0x1D41A + code - 97); // a-z
-        if (code >= 48 && code <= 57) return String.fromCodePoint(0x1D7CE + code - 48); // 0-9
-        return char;
-    }).join('');
-}
-
 const CommandManager = {
     handleSearch(searchWord, callbackSetList, appConfig) {
-        const input = searchWord.toLowerCase();
-
-        // 1. 精确匹配指令路由 (如完全命中了 '/mode' 或以 '/mode ' 开头)
-        for (const cmd of COMMANDS) {
-            const prefix = `/${cmd.trigger.toLowerCase()}`;
-            if (input === prefix || input.startsWith(prefix + ' ')) {
-                const subInput = searchWord.slice(prefix.length).trim();
-                return cmd.handleSearch(subInput, callbackSetList, appConfig);
+        try {
+            const input = (searchWord || '').toLowerCase().trim();
+            if (!input) {
+                callbackSetList([]);
+                return;
             }
-        }
 
-        // 2. 处于根级斜线页面，模糊匹配匹配命令列表 (如针对 '/')
-        const inputToken = searchWord.trim().toLowerCase();
-        const inputCmd = inputToken.startsWith('/') ? inputToken.slice(1) : '';
-        const matchedCommands = COMMANDS.filter(cmd => cmd.trigger.startsWith(inputCmd));
+            // 1. 精确前缀匹配路由逻辑：检测是否已完整进入某个指令（如 "/mode"）
+            for (const cmd of COMMANDS) {
+                const prefix = `/${cmd.trigger}`;
+                if (input === prefix || input.startsWith(prefix + ' ')) {
+                    const subInput = searchWord.slice(prefix.length).trim();
+                    return cmd.handleSearch(subInput, callbackSetList, appConfig);
+                }
+            }
 
-        if (matchedCommands.length > 0) {
-            const listItems = matchedCommands.map(cmd => {
-                const icon = cmd.trigger === 'libre' ? Icons.LIBRE : 
-                           cmd.trigger === 'target' ? Icons.LANG : Icons.MODE;
-                
-                const boldTrigger = toBoldUnicode(`/${cmd.trigger}`);
-                
-                return {
-                    title: `[${boldTrigger}]  ${cmd.title}`,
-                    description: cmd.description.replace(/\s*\(\/.*\)$/, ''),
+            // 2. 根级模糊搜索逻辑：根据当前输入过滤命令列表
+            // 提取核心关键词（去掉前导斜杠）
+            const keyword = input.startsWith('/') ? input.slice(1) : input;
+
+            const matched = COMMANDS.filter(cmd => {
+                // 只要触发词包含关键词，或者标题包含关键词
+                return cmd.trigger.indexOf(keyword) !== -1 || 
+                       cmd.title.toLowerCase().indexOf(keyword) !== -1;
+            });
+
+            if (matched.length > 0) {
+                const listItems = matched.map(cmd => ({
+                    title: `/${cmd.trigger} ${cmd.title}`,
+                    description: cmd.description,
                     isCommandContext: true,
                     trigger: cmd.trigger,
-                    isRootCommand: true,
-                    icon: icon
-                };
-            });
-            callbackSetList(listItems);
-        } else {
-            callbackSetList([
-                { title: '未找到匹配的命令', description: searchWord, icon: Icons.WARNING }
-            ]);
+                    isRootCommand: true
+                }));
+                callbackSetList(listItems);
+            } else {
+                callbackSetList([
+                    { title: '未找到匹配命令', description: '支持 /mode, /help, /target' }
+                ]);
+            }
+        } catch (e) {
+            console.error('[CommandManager] handleSearch error:', e);
+            callbackSetList([{ title: '命令引擎异常', description: e.message }]);
         }
     },
 

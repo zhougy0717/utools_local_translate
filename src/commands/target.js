@@ -9,10 +9,12 @@ class TargetLanguageCommand {
     }
 
     handleSearch(subInput, callbackSetList, appConfig) {
+        // Step 2.1: 暂时返回空列表
         callbackSetList([]);
     }
 
     handleSelect(itemData, appConfig) {
+        // Step 2.1: 暂无逻辑
         return {};
     }
 }
