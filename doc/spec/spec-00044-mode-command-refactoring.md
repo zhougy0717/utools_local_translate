@@ -63,11 +63,15 @@ package "src/commands" {
     }
   }
 
-  IModeHandler "1" *-- "*" Action : contains
-  ModeCommand o--> IModeHandler : "Routes by modeId"
   IModeHandler <|.. OfflineDictHandler : implements
   IModeHandler <|.. OllamaHandler : implements
   IModeHandler <|.. LibreTranslateHandler : implements
+
+  OfflineDictHandler "1" *-- "*" Action : uses internally
+  OllamaHandler "1" *-- "*" Action : uses internally
+  LibreTranslateHandler "1" *-- "*" Action : uses internally
+
+  ModeCommand o--> IModeHandler : "Routes by modeId"
 }
 @enduml
 ```
