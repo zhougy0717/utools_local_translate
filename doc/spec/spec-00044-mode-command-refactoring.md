@@ -192,9 +192,27 @@ handleSelect(itemData, appConfig, callbackSetList) {
 3. **状态修改合并归心与互斥保障**：曾经的老代码里，散落着十几处繁杂的相互剥夺活跃权的冗余代码（如 `appConfig.backends.offline_dict = false; appConfig.backends.ollama = true;` 等）。重构中我们将在 `mode.js` 或公共层抽离出一个互斥激活工具函数（如 `setActiveMode(appConfig, targetModeId)`），确保某一个后端被激活时，其他挂载的后端会自动被安全剥夺激活权（置为 `false`）。同时，底层不再零散调用 `utools.dbStorage.setItem`，而是统一交由上层 `mode.js` 在函数流转结束前根据 Signal 来统一落盘，杜绝忘写、漏写与数据覆盖冲突。
 4. **自动备用容灾处理 (Fallback Bypass)**：对于当引擎未处于 `READY` 强制跳转至 Config 页面的降级功能，会在抽离各模块时予以严格复刻。不论是通过共用的 Helper 处理还是被各 `Handler` 分别纳入，都能确信不可用节点同样无法触发导致异常的 `confirm_` 行动。
 
-## 4. 验收与测试
-- **白盒断言**：确认 `src/commands/mode.js` 行数大幅缩减且不存在任何硬编码后端识别 `if(modeId === '...')`。
-- **黑盒运行**：
-    - 输入 `/mode` 依然能够正常展示三个模式及正确状态词。
-    - 点击 Ollama 触发 “确认启用”/“打开配置” 的二级状态正确无误。
-    - `confirm_xx` 时能够成功切换活跃的后端，并在配置面板重载后不丢失设置。
+## 4. 验收与回归测试设计
+
+为了确保重构过程中不破坏任何存量交互逻辑，我们采用 **TDD (特性规格测试先行)** 的方案。
+
+### 4.1 自动化特性测试 (Characterization Tests)
+测试文件 `test/mode_refactoring.test.js` 锁定了 `mode.js` 重构前的行为，重构后必须持续通过以下断言：
+
+- **搜索展示测试 (`handleSearch`)**:
+  - 验证返回项总数一致（离线词典、Ollama、LibreTranslate 三项）。
+  - 验证已激活模式带有 `🌟` 标识。
+  - 验证子输入匹配过滤逻辑（如输入 "Olla" 仅返回 Ollama 项）。
+- **交互导航测试 (`handleSelect - Navigation`)**:
+  - 验证首次点击（无 Action）必须触发 `callbackSetList` 并回传二级菜单。
+  - 验证返回信号包含 `{ disableClear: true }` 以保持 uTools 列表开启。
+- **业务执行测试 (`handleSelect - Execution`)**:
+  - 验证 `confirm_*` 类 Action 执行后，`appConfig` 中对应后端设为 `true`，其他设为 `false`（互斥激活）。
+  - 验证执行后统一向 `utools.dbStorage` 发起持久化调用。
+  - 验证返回与老代码一致的业务信号（如 `{ reloadBackend: true, restoreSearch: true }`）。
+- **外部跳转测试**: 验证跳转至 LibreTranslate 文档的 Action 正确调用系统浏览器。
+
+### 4.2 验收白盒标准
+1. **代码精简**：`src/commands/mode.js` 不再包含任何具体的后端状态码（如 `STATUS.UNAVAILABLE`）或后端字段名（如 `backends.ollama`）。
+2. **逻辑内聚**：所有的 `confirm_` 分支逻辑必须在各自对应的 `src/commands/modes/*.js` 文件中闭环。
+3. **零退化**：运行 `/usr/local/bin/node --test test/mode_refactoring.test.js` 必须 100% 通过。
