@@ -46,20 +46,24 @@ package "src/commands" {
     + handleSelect(itemData, appConfig, callbackSetList): Signal
   }
 
-  class Action {
+  interface IAction {
     + id: String
     + execute(appConfig, itemData, callbackSetList): Signal
   }
 
   package "modes" {
     class OfflineDictHandler {
-      - actions: Map<String, Action>
+      - actions: Map<String, IAction>
     }
     class OllamaHandler {
-      - actions: Map<String, Action>
+      - actions: Map<String, IAction>
     }
     class LibreTranslateHandler {
-      - actions: Map<String, Action>
+      - actions: Map<String, IAction>
+    }
+    
+    class "ConcreteActions..." <<Entity>> {
+      + execute(...)
     }
   }
 
@@ -67,9 +71,10 @@ package "src/commands" {
   IModeHandler <|.. OllamaHandler : implements
   IModeHandler <|.. LibreTranslateHandler : implements
 
-  OfflineDictHandler "1" *-- "*" Action : uses internally
-  OllamaHandler "1" *-- "*" Action : uses internally
-  LibreTranslateHandler "1" *-- "*" Action : uses internally
+  IAction <|.. "ConcreteActions..." : implements
+  OfflineDictHandler "1" *-- "*" IAction : "composed of"
+  OllamaHandler "1" *-- "*" IAction : "composed of"
+  LibreTranslateHandler "1" *-- "*" IAction : "composed of"
 
   ModeCommand o--> IModeHandler : "Routes by modeId"
 }
