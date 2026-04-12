@@ -37,7 +37,7 @@ class ModeCommand <<Router>> {
 }
 
 interface IModeHandler {
-  + getSearchItemData()
+  + getSearchItemData(): ListItem
   + handleSelect()
 }
 
@@ -65,6 +65,39 @@ LibreTranslateHandler "1" *-- "*" IAction
 ModeCommand o--> IModeHandler : "Routes by modeId"
 @enduml
 ```
+
+### 2.2.1 getSearchItemData 标准化契约
+
+为了实现单一职责原则并剥离业务逻辑字段，所有 Handler 的 `getSearchItemData` 必须返回统一的 **ListItem** 对象。禁止在返回对象中包含 `currentStatus`, `extInfo` 等仅用于内部逻辑的冗余字段。这些字段在以往的设计中造成了数据膨胀与重复计算。
+
+**标准 ListItem 结构：**
+```javascript
+{
+  // --- UI 展示相关 (必选) ---
+  title: string,       // 模式名称 + 激活状态 (加星标 🌟)
+  description: string, // 状态预览 (✅/⚠️) + 模式描述
+  icon: string,        // 模式图标
+
+  // --- 路由与交互相关 (必选) ---
+  modeId: string,           // 用于路由分发 (如 'ollama')
+  isCommandContext: true,   // 固定为 true，保持在 /mode 场景
+  commandTrigger: 'mode'    // 固定为 'mode'
+}
+```
+通过此设计，`handleSelect` 在需要具体业务状态时应自主进行轻量化的重新计算，确保 UI 数据契约的纯粹性与稳定性。
+
+
+### 2.2.2 接口精简影响分析 (Safety Analysis)
+
+经核对，剥离冗余字段对现有功能 **零影响**，各 Handler 的 `handleSelect` 逻辑均已实现自主状态获取：
+
+| Handler | 移除的冗余字段 | 验证结论 |
+| :--- | :--- | :--- |
+| **Ollama** | `currentStatus` | `handleSelect` 第 62 行与 96 行均显式调用 `_getStatus` 获取最新配置与状态，不依赖 `itemData` 传参。 |
+| **OfflineDict** | `currentStatus`, `extInfo` | `handleSelect` 第 64 行与 98 行显式调用 `getDictStatus` 获取活性的词典状态，完全不依赖历史 Payload。 |
+| **LibreTranslate** | `currentStatus` | `handleSelect` 第 68 行与 110 行均自主执行 `_getStatus` 进行准入判定。 |
+
+**结论**：字段移除是安全的，其本质是清理了在重构过程中产生的“过度设计”残留，使主路由与子策略间的通信契约回归最简化。
 
 ### 2.3 mode.js (Router) 的 `handleSelect` 拆分设计
 

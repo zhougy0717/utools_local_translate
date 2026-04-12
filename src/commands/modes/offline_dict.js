@@ -51,8 +51,6 @@ class OfflineDictHandler {
             isCommandContext: true,
             commandTrigger: 'mode',
             modeId: this.id,
-            currentStatus: currentStatus,
-            extInfo: dictInfo,
             icon: this.icon
         };
     }

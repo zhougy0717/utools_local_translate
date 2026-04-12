@@ -58,7 +58,6 @@ class LibreTranslateHandler {
             isCommandContext: true,
             commandTrigger: 'mode',
             modeId: this.id,
-            currentStatus: status,
             icon: this.icon
         };
     }
