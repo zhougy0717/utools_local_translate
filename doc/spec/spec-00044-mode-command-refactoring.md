@@ -29,55 +29,40 @@ skinparam handwritten false
 skinparam monochrome true
 skinparam DefaultFontName sans-serif
 
-package "src/commands" {
-  class ModeCommand <<Router>> {
-    - handlers: Map<String, IModeHandler>
-    + trigger: "mode"
-    + handleSearch(subInput, callbackSetList, appConfig)
-    + handleSelect(itemData, appConfig, callbackSetList): Signal
-  }
-
-  interface IModeHandler {
-    + id: String
-    + title: String
-    + description: String
-    + icon: String
-    + getSearchItemData(appConfig): Object
-    + handleSelect(itemData, appConfig, callbackSetList): Signal
-  }
-
-  interface IAction {
-    + id: String
-    + execute(appConfig, itemData, callbackSetList): Signal
-  }
-
-  package "modes" {
-    class OfflineDictHandler {
-      - actions: Map<String, IAction>
-    }
-    class OllamaHandler {
-      - actions: Map<String, IAction>
-    }
-    class LibreTranslateHandler {
-      - actions: Map<String, IAction>
-    }
-    
-    class "ConcreteActions..." <<Entity>> {
-      + execute(...)
-    }
-  }
-
-  IModeHandler <|.. OfflineDictHandler : implements
-  IModeHandler <|.. OllamaHandler : implements
-  IModeHandler <|.. LibreTranslateHandler : implements
-
-  IAction <|.. "ConcreteActions..." : implements
-  OfflineDictHandler "1" *-- "*" IAction : "composed of"
-  OllamaHandler "1" *-- "*" IAction : "composed of"
-  LibreTranslateHandler "1" *-- "*" IAction : "composed of"
-
-  ModeCommand o--> IModeHandler : "Routes by modeId"
+class ModeCommand <<Router>> {
+  - handlers: Map<String, IModeHandler>
+  + trigger: "mode"
+  + handleSearch()
+  + handleSelect()
 }
+
+interface IModeHandler {
+  + getSearchItemData()
+  + handleSelect()
+}
+
+interface IAction {
+  + execute()
+}
+
+package "Handlers" {
+  class OfflineDictHandler
+  class OllamaHandler
+  class LibreTranslateHandler
+}
+
+class ConcreteActions <<Entity>>
+
+IModeHandler <|.. OfflineDictHandler
+IModeHandler <|.. OllamaHandler
+IModeHandler <|.. LibreTranslateHandler
+
+IAction <|.. ConcreteActions
+OfflineDictHandler "1" *-- "*" IAction
+OllamaHandler "1" *-- "*" IAction
+LibreTranslateHandler "1" *-- "*" IAction
+
+ModeCommand o--> IModeHandler : "Routes by modeId"
 @enduml
 ```
 
