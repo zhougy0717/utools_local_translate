@@ -16,23 +16,106 @@
 在 `src/commands/index.js` 的 `CommandManager` 对象中增加：
 - `activeCommand`: 存储当前锁定的指令处理器实例。
 
-### 3.2 路由分发算法 (Dispatching Algorithm)
-`CommandManager.handleSearch` 的逻辑更新为：
+### 3.2 交互场景与路由逻辑 (Scenarios)
 
-| 优先级 | 匹配条件 | 动作 |
-| :--- | :--- | :--- |
-| 1 | 输入以 `/` 开头且完全符合某前缀 (如 `/target `) | **重置上下文**为该指令，并分发子输入。 |
-| 2 | 输入**不以** `/` 开头，但 `hasActiveContext` 为真 | **透穿上下文**，将输入交给活跃指令处理器过滤。 |
-| 3 | 输入以 `/` 开头但未完全匹配前缀 | **清除上下文**，执行一级指令名的模糊搜索。 |
-| 4 | 其他情况 | **清除上下文**，返回空列表，将控制权还给 `preload.js` 执行翻译任务。 |
+#### 3.2.1 场景一：显式进入指令 (Explicit Entry)
+当用户输入完整指令前缀或从一级列表点击进入时，立即锁定上下文。
 
-### 3.3 生命周期管理 (Lifecycle)
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
+actor User
+participant CM as "CommandManager"
+participant TC as "TargetCommand"
+
+User -> CM: 输入 "/target " 或点击该项
+CM -> CM: 匹配前缀, activeCommand = TC
+CM -> TC: delegate handleSearch("")
+TC -->> User: 渲染全量二级列表 (语言列表)
+@enduml
+```
+
+#### 3.2.2 场景二：隐式子项过滤 (Contextual Filtering)
+在锁定状态下，直接输入普通字符即可进行过滤。
+
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
+actor User
+participant CM as "CommandManager"
+participant TC as "TargetCommand"
+
+note over CM: activeCommand == TargetCommand
+User -> CM: 输入 "chi" (不带 /)
+CM -> TC: 发现 Context, 透传 handleSearch("chi")
+TC -->> User: 渲染过滤后的列表 ("中文")
+@enduml
+```
+
+#### 3.2.3 场景三：粘性列表与手动返回 (Sticky Mode)
+清空内容不自动退出，而是改为显示“手动返回项”以防误触退出。
+
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
+actor User
+participant CM as "CommandManager"
+participant TC as "TargetCommand"
+
+User -> CM: Backspace 清空输入框内容
+note over CM: 保持 activeCommand == TC
+CM -> TC: handleSearch("")
+TC -->> User: 渲染 [🔙 返回查词] + 全量二级列表
+@enduml
+```
+
+#### 3.2.4 场景四：指令优先级抢占 (Preemption)
+在模式内输入新的斜杠指令，自动切换上下文。
+
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
+actor User
+participant CM as "CommandManager"
+participant MC as "ModeCommand"
+
+note over CM: activeCommand == TargetCommand
+User -> CM: 输入 "/mode"
+CM -> CM: 匹配新前缀, activeCommand = MC
+CM -> MC: delegate handleSearch("")
+MC -->> User: 瞬间切换渲染模式选择列表
+@enduml
+```
+
+#### 3.2.5 场景五：彻底退出重启 (Explicit Exit)
+通过返回项退出或完成业务逻辑。
+
+```plantuml
+@startuml
+skinparam sequenceMessageAlign center
+autonumber
+actor User
+participant CM as "CommandManager"
+participant TC as "TargetCommand"
+
+User -> CM: 点击列表首项 "[🔙 返回查词]"
+CM -> CM: reset context = null
+CM -->> User: 复原查词主界面 (渲染翻译结果)
+@enduml
+```
+
+### 3.3 生命周期管理 (Lifecycle - Sticky)
 | 事件 | 行为 | 理由 |
 | :--- | :--- | :--- |
-| **选择一级指令** | 锁定对应的 `activeCommand` | 用户明确表达了开始指令流的意愿。 |
-| **选择二级结果项** | 清除 `activeCommand` | 操作已完成（如语言已设好），应退出指令流。 |
-| **清空搜索框** | 清除 `activeCommand` | 物理清空是 uTools 中最自然的“退出/重置”信号。 |
-| **输入其他 `/` 指令** | 切换到新的 `activeCommand` | 显式切换优先级最高。 |
+| **选择一级指令** | 锁定对应的 `activeCommand` | 用户明确进入。 |
+| **选择二级结果项** | 清除 `activeCommand` | 单次操作流程结束。 |
+| **输入框变为内容** | **保持** `activeCommand` | **粘性模式**：防止误删导致掉出菜单。 |
+| **点击 [返回查词]** | 清除 `activeCommand` | 用户手动退出。 |
+| **输入其他 `/` 指令** | 切换到新的 `activeCommand` | 模式抢占。 |
 
 ## 4. 关键代码变更点
 
