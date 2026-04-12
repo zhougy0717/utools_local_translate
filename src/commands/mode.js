@@ -2,6 +2,8 @@ const offlineDictHandler = require('./modes/offline_dict');
 const ollamaHandler = require('./modes/ollama');
 const libreTranslateHandler = require('./modes/libretranslate');
 
+const Icons = require('./icons');
+
 // 策略映射表
 const handlerMap = {
     [offlineDictHandler.id]: offlineDictHandler,
@@ -21,11 +23,23 @@ module.exports = {
         const items = handlers.map(handler => handler.getSearchItemData(appConfig));
 
         // 基于子输入进行简单筛选
-        const fuzzyInput = subInput.trim().toLowerCase();
+        const fuzzyInput = (subInput || '').trim().toLowerCase();
         const filteredItems = items.filter(item =>
             item.title.toLowerCase().includes(fuzzyInput) ||
             item.description.toLowerCase().includes(fuzzyInput)
         );
+
+        // 粘性模式支持：在空输入时提供手动返回选项
+        if (!fuzzyInput) {
+            filteredItems.unshift({
+                title: '🔙 返回查词翻译',
+                description: '取消模式切换，返回主查询界面',
+                isCommandContext: true,
+                commandTrigger: this.trigger,
+                isReturnToMain: true,
+                icon: Icons.BACK
+            });
+        }
 
         callbackSetList(filteredItems);
     },

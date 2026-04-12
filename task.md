@@ -1,16 +1,15 @@
-# Task: Implement Target Language Command (/target) Step-by-Step (Granular)
+# Task: Context-based Command Filtering (Sticky Mode)
 
-### Phase 1: Data Model & Persistence
-- [x] Add `translationLanguage` defaults to `app_config.js`
-- [x] Implement `getTranslationTarget()` and `setTranslationTarget()` in `AppConfig` class
-
-### Phase 2: Granular Command Integration
-- [x] 2.1 Create minimal empty `src/commands/target.js` (valid but static)
-- [x] 2.2 Register `target.js` in `src/commands/index.js` (Check if /mode breaks here)
-- [x] 2.3 Implement single hardcoded item in `handleSearch` (Verify routing)
-- [x] 2.4 Implement full language list in `handleSearch`
-- [x] 2.5 Implement `handleSelect` logic
-
-### Phase 3: Translation Flow Integration
-- [x] Support `targetOverride` in `UtoolsHelper.detectLanguages`
-- [x] Integrate into `preload.js`
+- [x] Refactor `CommandManager` (src/commands/index.js)
+    - [x] Add `activeCommand` state and helper methods
+    - [x] Implement 4-tier routing in `handleSearch`
+    - [x] Update `handleSelect` to manage context lifecycle
+- [x] Update `preload.js` search dispatching logic
+- [x] Support "Return to Translation" items in sub-commands
+    - [x] Modify `src/commands/target.js`
+    - [x] Modify `src/commands/mode.js`
+- [x] Verification
+    - [x] Manual test of `/target` flow
+    - [x] Manual test of Sticky Mode (empty input)
+    - [x] Manual test of Context Switch
+    - [x] Regression test of standard translation

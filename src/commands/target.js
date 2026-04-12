@@ -33,6 +33,18 @@ class TargetLanguageCommand {
                 };
             });
 
+        // 粘性模式支持：在空输入时提供手动返回选项
+        if (!fuzzyInput) {
+            items.unshift({
+                title: '🔙 返回查词翻译',
+                description: '退出语言设置，返回主查询界面',
+                isCommandContext: true,
+                commandTrigger: this.trigger,
+                isReturnToMain: true,
+                icon: Icons.BACK
+            });
+        }
+
         callbackSetList(items);
     }
 

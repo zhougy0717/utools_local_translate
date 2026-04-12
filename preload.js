@@ -151,12 +151,17 @@ if (typeof window !== 'undefined') {
           }
 
           if (!searchWord || !searchWord.trim()) {
+            // 粘性模式支持：即便输入为空，如果处于指令模式中，也要交给指令中心处理（显示全量列表+返回项）
+            if (CommandManager.hasContext()) {
+              CommandManager.handleSearch('', callbackSetList, appConfig);
+              return;
+            }
             callbackSetList([]);
             return;
           }
           const w = searchWord.trim();
 
-          if (w.startsWith('/')) {
+          if (w.startsWith('/') || CommandManager.hasContext()) {
             CommandManager.handleSearch(w, callbackSetList, appConfig);
             return;
           }
@@ -247,10 +252,17 @@ if (typeof window !== 'undefined') {
                   console.log('[Preload][Mode] Backend reloaded for:', BackendManager.getBackendName());
                 }
 
-                if (signal.restoreSearch && lastWordToSearch) {
-                  console.log('[Preload] Mode switch complete, restoring search word:', lastWordToSearch);
+                // 核心修复：如果需要恢复搜索
+                if (signal.restoreSearch) {
+                  // 如果有历史词，恢复它；如果没有（比如刚进插件），则清空输入框以触发重置
+                  const wordToSet = lastWordToSearch || '';
+                  console.log('[Preload] Restore search signal received, setting input to:', wordToSet);
+                  
+                  // 强制清除 context（双重保障）并重置 UI
+                  CommandManager.clearContext();
+                  
                   requestAnimationFrame(() => {
-                    utools.setSubInputValue(lastWordToSearch);
+                    utools.setSubInputValue(wordToSet);
                   });
                 }
               })
