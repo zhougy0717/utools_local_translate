@@ -154,7 +154,6 @@ stop
 @enduml
 ```
 
-在重构后的代码层级上，`handleSelect` 退化为简练的结构：
 1. **依据 `modeId` 路由查找**：从传入的 `itemData.modeId` 匹配出已注册的 Handler 对象。
 2. **底层职责委派**：调用 `handler.handleSelect(...)`，转交上下文。
 
@@ -175,6 +174,14 @@ handleSelect(itemData, appConfig, callbackSetList) {
     return {};
 }
 ```
+
+### 2.7 存量“兜底与最终执行”逻辑 (296-333行) 的迁移映射
+原 `mode.js` 中最后 40 行的臃肿逻辑将通过以下方式在重构中整合：
+
+- **状态实时复核 (296-307行)**：迁移至各 Handler 内部。Handler 在处理 `confirm_` 或 `open_config` 时，会首先自发调用状态检测函数（如 `getOllamaStatus`）进行准入校验。
+- **Fallback 强制重定向 (310-324行)**：迁移至各 Handler 的业务决策分支。当 Handler 检测到状态不为 `READY` 时，会主动抛出 `{ openConfigPanel: true, reloadBackend: true }` 信号。
+- **互斥激活逻辑 (312-314, 327-329行)**：通过公共 Helper 函数 `setActiveMode(appConfig, modeId)` 替代。Handler 只需调用此函数，即可自动完成“一真多假”的 backend 属性设置。
+- **原子化持久化 (316-333行)**：迁移至 `ModeCommand.handleSelect` 的中央收尾层（见 2.6 节代码示意）。通过对 `signal.disableClear` 的标志位判断，统一管理 `utools.dbStorage.setItem` 的调用时机。
 
 ## 3. 拆分稳定性与防退化保证 (Regression Safety)
 
