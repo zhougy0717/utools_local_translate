@@ -71,9 +71,9 @@ ModeCommand o--> IModeHandler : "Routes by modeId"
 #### 子模块 Handler (策略实现) 拆分清单表
 在具体的设计流转中，从 `mode.js` 中抽出并原子化分工的子 Handler（严格对应上一节类图中的三个具体实现类）包含了：
 
-- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`): 承接状态判定，全权接管提取离线词典通过 `!itemData.action` 渲染的二级菜单逻辑及其关联的 **Action 列表**。
-- **`OllamaHandler`** (`src/commands/modes/ollama.js`): 承接应用联通状态检查，全权接管提取 Ollama 首层点击时构建二级导航的逻辑及其关联的 **Action 列表**。
-- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`): 承接 API 状态检查，全权接管提取 Libre 二级导航的构建逻辑及其关联的 **Action 列表**。
+- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`): 承接状态判定，全权接管提取离线词典二级菜单逻辑。其管理的实体 Action 包含：`confirm_dict` (确认启用), `open_dict_config` (打开配置)。
+- **`OllamaHandler`** (`src/commands/modes/ollama.js`): 承接应用联通状态检查，全权接管构建 Ollama 二级导航逻辑。其管理的实体 Action 包含：`confirm_ollama` (确认启用), `open_ollama_config` (打开配置)。
+- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`): 承接 API 状态检查，全权接管构建 Libre 二级导航逻辑。其管理的实体 Action 包含：`confirm_libre` (确认启用), `open_libre_config` (打开配置), `open_libre_docs` (查看文档)。
 
 ### 2.4 各 Handler 职责剥离明细 (Action 映射表)
 为了确保重构不遗漏任何逻辑，下表列出了从原 `mode.js` 中剥离并封装进各 Handler 内部的 `Action` 对象：
