@@ -1,0 +1,13 @@
+/**
+ * 模式命令通用的状态定义
+ */
+const STATUS = {
+    READY: 'READY',
+    UNAVAILABLE: 'UNAVAILABLE',
+    DOWNLOADING: 'DOWNLOADING',
+    DOWNLOADED_UNPROCESSED: 'DOWNLOADED_UNPROCESSED'
+};
+
+module.exports = {
+    STATUS
+};
