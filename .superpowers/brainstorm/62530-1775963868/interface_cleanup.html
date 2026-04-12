@@ -1,0 +1,57 @@
+<h2>接口清理：统一 ListItem 契约</h2>
+<p class="subtitle">将业务逻辑与 UI 展示彻底剥离 (方案 A)</p>
+
+<div class="section">
+  <h3>当前设计（数据臃肿）</h3>
+  <div class="mockup">
+    <div class="mockup-header">Handler 返回值示例 (OfflineDict)</div>
+    <div class="mockup-body">
+<pre style="background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px;">
+{
+  title: "离线词典 (已激活 🌟)",
+  description: "✅ 词库已就绪 — 使用 ecdict...",
+  icon: "icons/dict.png",
+  modeId: "offline_dict",
+  <span style="color: #f48771;">currentStatus: "READY", // 业务字段</span>
+  <span style="color: #f48771;">extInfo: { ... },       // 业务字段</span>
+  isCommandContext: true,
+  commandTrigger: "mode"
+}
+</pre>
+      <p style="color: #f48771; font-size: 14px; margin-top: 8px;">⚠️ 问题：这些字段在 handleSelect 中又被重算了一次，属于冗余数据。</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>理想设计（极致精简）</h3>
+  <div class="mockup">
+    <div class="mockup-header">统一 ListItem 接口</div>
+    <div class="mockup-body">
+<pre style="background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px;">
+{
+  // 仅包含 UI 展示必需字段
+  title: String,
+  description: String,
+  icon: String,
+
+  // 仅包含路由与交互必需字段
+  modeId: String,
+  isCommandContext: true,
+  commandTrigger: "mode"
+}
+</pre>
+      <p style="color: #75beff; font-size: 14px; margin-top: 8px;">✅ 优点：所有 Handler 返回一致，逻辑严谨，单一职责。</p>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="approve" onclick="toggleSelect(this)">
+    <div class="letter">✓</div>
+    <div class="content">
+      <h3>确认方案</h3>
+      <p>统一所有 getSearchItemData 的返回值为标准 ListItem</p>
+    </div>
+  </div>
+</div>

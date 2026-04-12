@@ -245,8 +245,16 @@ class BackendManager {
     return this._dedicatedOllamaBackend;
   }
 
-  /**
-   * 关闭当前加载的设置面板（如果有）
+    /**
+     * 判断当前是否有处于激活状态的配置面板
+     * @returns {boolean}
+     */
+    hasActivePanel() {
+        return !!this.currentConfigPanel;
+    }
+
+    /**
+     * 关闭当前打开的配置面板 (如果有)
    * @param {boolean} isSilent 是否静默关闭（例如在搜索触发时，不需要重置高度或归还焦点）
    */
   closeCurrentConfigPanel(isSilent = false) {

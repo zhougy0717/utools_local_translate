@@ -21,11 +21,19 @@ function isLikelyChinese(text) {
 /**
  * 根据内容自动判定源语言和目标语言
  * @param {string} text - 待判定文本
+ * @param {string} [targetOverride='auto'] - 强制指定的目标语言 (可选)
  * @returns {{source: string, target: string, isZhToEn: boolean}}
  */
-function detectLanguages(text) {
+function detectLanguages(text, targetOverride = 'auto') {
   const isZh = isLikelyChinese(text);
   const source = isZh ? 'zh' : 'en';
+  
+  // 如果用户指定了非 auto 的目标语言，则直接使用
+  if (targetOverride && targetOverride !== 'auto') {
+    return { source, target: targetOverride, isZhToEn: isZh };
+  }
+
+  // 默认逻辑：自动反向翻译 (中->英, 非中->中)
   const target = isZh ? 'en' : 'zh';
   return { source, target, isZhToEn: isZh };
 }

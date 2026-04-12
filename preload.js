@@ -29,7 +29,8 @@ function applyEnterWithWord(word, callbackSetList) {
   if (!w || w.length > MAX_SELECTION_LENGTH) return false;
   if (typeof utools !== 'undefined') utools.setSubInputValue(w);
   
-  const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w);
+  const targetOverride = appConfig.getTranslationTarget();
+  const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w, targetOverride);
 
   callbackSetList(ViewPresenter.buildLoadingItem(BackendManager.getLoadingMessage()));
 
@@ -100,8 +101,9 @@ if (typeof window !== 'undefined') {
             console.log('[Preload] Image translation triggered');
             callbackSetList(ViewPresenter.buildLoadingItem('正在预处理并识别图中文字...'));
             
-            // 使用默认查词语言逻辑确定目标语言
-            const { target } = UtoolsHelper.detectLanguages(''); // 默认目标
+            // 使用用户配置或默认逻辑确定目标语言
+            const targetOverride = appConfig.getTranslationTarget();
+            const { target } = UtoolsHelper.detectLanguages('', targetOverride);
 
             _preprocessImage(action.payload).then(processedPayload => {
                 const startTime = Date.now();
@@ -155,7 +157,7 @@ if (typeof window !== 'undefined') {
           const w = searchWord.trim();
 
           if (w.startsWith('/')) {
-            CommandManager.handleSearch(w, callbackSetList, appConfig.load());
+            CommandManager.handleSearch(w, callbackSetList, appConfig);
             return;
           }
 
@@ -176,7 +178,8 @@ if (typeof window !== 'undefined') {
               console.log('[Preload] Rendering Loading Item:', loadingMsg);
               callbackSetList(ViewPresenter.buildLoadingItem(loadingMsg));
 
-              const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w);
+              const targetOverride = appConfig.getTranslationTarget();
+              const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w, targetOverride);
 
               // 步骤 3: 渲染 Loading 后的保障期。设置 300ms 延迟可有效防止后续可能产生的
               // 同步阻塞任务（如大语言模型首包生成前的计算）直接抢占 UI 渲染帧，从而确保“搜索中”状态可见。
@@ -215,7 +218,7 @@ if (typeof window !== 'undefined') {
           }
 
           if (itemData.isCommandContext) {
-            Promise.resolve(CommandManager.handleSelect(itemData, appConfig.load(), callbackSetList))
+            Promise.resolve(CommandManager.handleSelect(itemData, appConfig, callbackSetList))
               .then(signal => {
                 if (!signal) return;
 

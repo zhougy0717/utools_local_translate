@@ -2,18 +2,12 @@ const modeCommand = require('./mode.js');
 const helpCommand = require('./help.js');
 const targetCommand = require('./target.js');
 
-// 注册并规格化激活的所有命令，确保 trigger/title 等属性可被稳定探测
+// 注册激活的所有命令
 const COMMANDS = [
     modeCommand,
     helpCommand,
     targetCommand
-].map(cmd => ({
-    trigger: String(cmd.trigger || '').toLowerCase(),
-    title: String(cmd.title || ''),
-    description: String(cmd.description || ''),
-    handleSearch: cmd.handleSearch,
-    handleSelect: cmd.handleSelect
-}));
+];
 
 const Icons = require('./icons.js');
 
@@ -46,13 +40,18 @@ const CommandManager = {
             });
 
             if (matched.length > 0) {
-                const listItems = matched.map(cmd => ({
-                    title: `/${cmd.trigger} ${cmd.title}`,
-                    description: cmd.description,
-                    isCommandContext: true,
-                    trigger: cmd.trigger,
-                    isRootCommand: true
-                }));
+                const listItems = matched.map(cmd => {
+                    const icon = cmd.trigger === 'libre' ? Icons.LIBRE : 
+                               cmd.trigger === 'target' ? Icons.LANG : Icons.MODE;
+                    return {
+                        title: `/${cmd.trigger} ${cmd.title}`,
+                        description: cmd.description,
+                        isCommandContext: true,
+                        trigger: cmd.trigger,
+                        isRootCommand: true,
+                        icon: icon
+                    };
+                });
                 callbackSetList(listItems);
             } else {
                 callbackSetList([
