@@ -79,12 +79,9 @@ package "src/commands" {
 #### 子模块 Handler (策略实现) 拆分清单表
 在具体的设计流转中，从 `mode.js` 中抽出并原子化分工的子 Handler（严格对应上一节类图中的三个具体实现类）包含了：
 
-- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`)
-  - 承接离线词典的健康状态判定。**全权接管原通过 `!itemData.action` 判断并渲染离线词典二级菜单的逻辑**，以及后续最终的动作 `confirm_dict` 与 `open_dict_config`。
-- **`OllamaHandler`** (`src/commands/modes/ollama.js`)
-  - 承接 Ollama 联通状态检查。**全权接管首层被点击时构建 Ollama 二级导航的逻辑**，以及后续的动作 `confirm_ollama` 与 `open_ollama_config`。
-- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`)
-  - 承接 Libre API 的状态检查。**全权接管展开 Libre 二级导航的构建过程**，及相关的确认动作 `confirm_libre`、`open_libre_config` 与跳转文档的 `open_libre_docs`。
+- **`OfflineDictHandler`** (`src/commands/modes/offline_dict.js`): 承接状态判定，全权接管提取离线词典通过 `!itemData.action` 渲染的二级菜单逻辑及其关联的 `confirm_dict` 与 `open_dict_config` 动作。
+- **`OllamaHandler`** (`src/commands/modes/ollama.js`): 承接应用联通状态检查，全权接管提取 Ollama 首层点击时构建二级导航的逻辑及其关联的 `confirm_ollama` 与 `open_ollama_config` 动作。
+- **`LibreTranslateHandler`** (`src/commands/modes/libretranslate.js`): 承接 API 状态检查，全权接管提取 Libre 二级导航的构建逻辑及其关联的 `confirm_libre`、`open_libre_config` 与 `open_libre_docs` 动作。
 
 此时的 `mode.js` 将由原本承担所有底层状态判断与子级动作匹配的重度角色，退化为单纯的“中转路由”。
 
