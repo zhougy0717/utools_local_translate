@@ -4,30 +4,37 @@
 当前翻译插件的源语言和目标语言依赖内容推断（中英文互译）。根据系统的多态后端架构，源语言 (`source`) 的强制设定对于各类核心翻译引擎（如 Ollama 及本地词典）并无实质意义且极易造成干预幻觉。
 本设计的目的是引入精简版的单一全局语言指令 —— `/target` 斜线命令。允许用户为所有后端引擎配置全局持久化的**目标语言**，该静态配置将优先覆盖原有的目标语言探测机制，而源语言一律托管给后端的默认行为或大模型的自动识别。
 
-## 2. 架构与数据流
-1. **app_config.js**：负责维护和保存用户自定义目标语言配置的持久化状态。
-2. **src/commands/language.js**：定义 UI 交互，基于预设的常见语言列表处理 `/target` 命令的选择事件。
-3. **preload.js / 后端分发层**：仅从配置中抽取 `target`，原封不动地交由多态后端自行去解释和消费。
+## 2. 软件架构设计 (Software Architecture)
+
+本指令基于重构后的命令系统流转，遵循 **ICommand** 插件化契约：
+
+1. **CommandManager (Router)**：作为顶层网关，拦截 `/target` 关键字并路由至具体的指令处理器。
+2. **TargetLanguageCommand (src/commands/target.js)**：实现具体的指令逻辑，负责呈现可选语言列表并处理状态更新。
+3. **AppConfig (Data Layer)**：维护 `translationLanguage` 配置项，提供全局持久化支持。
+4. **Signal Contract (Communication)**：指令执行后回传标准信号（如 `restoreSearch`），由 `preload.js` 响应并触发翻译界面刷新。
 
 ## 3. 详细设计
 
-### 3.1 数据存储 (`app_config.js`)
-- **默认状态**：在 `APP_CONFIG_DEFAULTS` 中增加缺省项（无需 source）：
+### 3.1 数据持久化 (`app_config.js`)
+- **存储结构**：在 `APP_CONFIG_DEFAULTS` 中维护统一的语言偏好：
   ```javascript
   translationLanguage: {
-    target: 'auto'
+    target: 'auto' // 缺省为自动探测反向翻译
   }
   ```
-- **配置方法**：在 `AppConfig` 类中添加 `getTranslationTarget()` 和 `setTranslationTarget(targetCode)` 接口，以便支持安全的读写，并保证持久化写入 uTools 原生数据库。
+- **接口扩展**：在 `AppConfig` 类中封装 `getTranslationTarget()` 与 `setTranslationTarget(code)`，实现对 `utools.dbStorage` 的安全落盘。
 
-### 3.2 命令交互层 (`src/commands/language.js`)
-- **注册命令**：在 `src/commands/index.js` 中注册 `/target`（目标语言）入口。
-- **列表数据**：新建命令处理模块，在其中定义统一的配置列表。显示项包含：自动推断 (auto)、简体中文 (zh)、英语 (en)、日语 (ja)、韩语 (ko)、法语 (fr)、西班牙语 (es)、俄语 (ru) 等。
-- **操作响应**：当用户在界面中选择任意一种目标语言后：
-  1. 获取所选项对应的标准语言代码。
-  2. 更新 `app_config` 中的 `target` 值。
-  3. 调用 `utools.showNotification` 在宿主界面通知用户更新成功。
-  4. 清除或复原输入框内容，确保业务顺滑。
+### 3.2 指令交互实现 (`src/commands/target.js`)
+遵循命令接口规范进行封装：
+
+- **handleSearch(subInput, callbackSetList, appConfig)**：
+  - 加载支持的语言字典（zh, en, ja, ko, fr, es, ru 等）。
+  - 对比 `appConfig.translationLanguage`，为当前选中的语言标记 `🌟 (已设为目标)`。
+  - 支持 `subInput` 对语言名称进行模糊过滤。
+- **handleSelect(itemData, appConfig)**：
+  1. 调用 `appConfig.setTranslationTarget(itemData.langCode)` 更新配置。
+  2. 调用 `utools.showNotification` 提供 UI 反馈。
+  3. 返回 `{ restoreSearch: true }` 信号，告知宿主重载翻译业务逻辑。
 
 ### 3.3 多态的后端推断逻辑 (Backend Polymorphism)
 - 在 `preload.js` 层，放弃以往的前置拦截机制，只取目标语言配置，源语言固化为 `'auto'`。
