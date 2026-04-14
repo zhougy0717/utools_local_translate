@@ -2,7 +2,7 @@
  * 该文件包含了 LibreTranslate 官方支持的语言列表
  * 自动生成的中文映射增强版
  */
-module.exports = [
+const SUPPORTED_LANGUAGES = [
     { "code": "auto", "name": "自动推断 (反向翻译)", "desc": "根据输入内容自动判断 (中翻英 / 英翻中)" },
     { "code": "en", "name": "英语 (English)", "desc": "强制翻译为 英语" },
     { "code": "zh", "name": "简体中文 (Chinese)", "desc": "强制翻译为 简体中文" },
@@ -48,3 +48,18 @@ module.exports = [
     { "code": "uk", "name": "乌克兰语 (Ukrainian)", "desc": "强制翻译为 乌克兰语" },
     { "code": "vi", "name": "越南语 (Vietnamese)", "desc": "强制翻译为 越南语" }
 ];
+
+/**
+ * 根据语言代码获取显示名称
+ * @param {string} code 
+ * @returns {string}
+ */
+function getNameByCode(code) {
+    const lang = SUPPORTED_LANGUAGES.find(l => l.code === code);
+    if (!lang) return code;
+    // 去掉中文名后的括号部分，例如 "英语 (English)" -> "英语"
+    return lang.name.split(' (')[0];
+}
+
+module.exports = SUPPORTED_LANGUAGES;
+module.exports.getNameByCode = getNameByCode;

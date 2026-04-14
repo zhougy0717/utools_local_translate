@@ -52,7 +52,8 @@ module.exports = {
 
             // 2. 中央持久化收尾：如果不是仅为了展开二级菜单（disableClear），则统一存盘
             if (typeof utools !== 'undefined' && signal && !signal.disableClear) {
-                utools.dbStorage.setItem('app_config', appConfig);
+                // IMPORTANT: 使用 appConfig.save() 而不是直接存实例对象
+                appConfig.save(appConfig);
             }
 
             return signal;

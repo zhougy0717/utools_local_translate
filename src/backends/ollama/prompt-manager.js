@@ -1,3 +1,5 @@
+const { getNameByCode } = require('../../commands/languages');
+
 /**
  * Prompt 管理器
  * 负责管理 AI 任务的提示词模板及动态生成逻辑
@@ -27,45 +29,43 @@ class PromptManager {
 
 待处理业务描述: [TEXT]
     候选名称短语 (用 | 分隔): `,
-      vision: "参考图中显示的图片内容 [img-0]，你是一位专业的 OCR 和翻译专家。请执行以下步骤：\n1. 提取图中文字原文。\n2. 智能翻译逻辑：若原文是中文，则翻译成英文；若原文是其他语言（如英文），则翻译成中文。\n\n请按以下结构输出：\n\nSOURCE:\n(识别出的原文)\n\nTARGET:\n(根据上述逻辑生成的译文)\n\n注意：严禁包含任何额外的解释或引言。只输出 SOURCE 和 TARGET 两个区块的内容。"
+      vision: "参考图中显示的图片内容 [img-0]，你是一位专业的 OCR 和翻译专家。请将图中的内容翻译为 [TARGET_LANG]。\n\n请按以下结构输出：\n\nSOURCE:\n(识别出的原文)\n\nTARGET:\n(根据上述逻辑生成的 [TARGET_LANG] 译文)\n\n注意：严禁包含任何额外的解释或引言。只输出 SOURCE 和 TARGET 两个区块的内容。"
     };
   }
 
   /**
    * 基于任务类型获取并构建 Prompt
    * @param {string} taskType - advanced | naming | vision
-   * @param {Object} context - { text, targetLangCode }
+   * @param {Object} context - { text, targetLangCode, customPrompt }
    */
   getPrompt(taskType, context) {
-    let template = this.templates.advanced;
-    if (taskType === 'naming') template = this.templates.naming;
-    else if (taskType === 'vision') template = this.templates.vision;
+    const customPrompt = context.customPrompt || context.prompt;
+    let template = customPrompt || this.templates.advanced;
     
-    // 语言代码转文字
-    let targetLang = '中文';
-    const code = context.targetLangCode || context.targetLang; // 兼容旧参数名
-    if (code === 'en') targetLang = '英文';
-    else if (code === 'ja') targetLang = '日语';
-    else if (code === 'ko') targetLang = '韩语';
+    if (taskType === 'naming') template = this.templates.naming;
+    else if (taskType === 'vision') {
+        // vision 任务暂不支持自定义 Prompt 覆盖，使用专用模板
+        template = this.templates.vision;
+    }
+    
+    // 动态获取语言名称
+    const targetCode = context.targetLangCode || context.targetLang;
+    const targetLangName = getNameByCode(targetCode);
 
     return this.buildPrompt(template, {
       text: context.text,
-      targetLang: targetLang
+      targetLang: targetLangName
     });
   }
 
   /**
    * 获取 Prompt 模板 (仅替换语言，保留 [TEXT] 占位符供 UI 使用)
    */
-  getPromptTemplate(taskType, targetLangCode) {
-    const template = taskType === 'naming' ? this.templates.naming : this.templates.advanced;
-    
-    let targetLang = '中文';
-    if (targetLangCode === 'en') targetLang = '英文';
-    else if (targetLangCode === 'ja') targetLang = '日语';
-    else if (targetLangCode === 'ko') targetLang = '韩语';
+  getPromptTemplate(taskType, targetLangCode, customPrompt) {
+    const baseTemplate = customPrompt || (taskType === 'naming' ? this.templates.naming : this.templates.advanced);
+    const targetLangName = getNameByCode(targetLangCode);
 
-    return template.replace(/\[TARGET_LANG\]/g, targetLang);
+    return baseTemplate.replace(/\[TARGET_LANG\]/g, targetLangName);
   }
 
   /**
@@ -78,12 +78,26 @@ class PromptManager {
     if (!template) return '';
     let result = template;
     
+    // 兼容性替换：同时支持 [TARGET_LANG] 和旧版的 ${target_lang}
     if (context.targetLang) {
       result = result.replace(/\[TARGET_LANG\]/g, context.targetLang);
+      result = result.replace(/\$\{target_lang\}/g, context.targetLang);
     }
     
+    // 文本替换：同时支持 [TEXT] 和旧版的 ${text}
+    let textReplaced = false;
     if (context.text) {
-      result = result.replace(/\[TEXT\]/g, context.text);
+      if (result.includes('[TEXT]') || result.includes('${text}')) {
+        result = result.replace(/\[TEXT\]/g, context.text);
+        result = result.replace(/\$\{text\}/g, context.text);
+        textReplaced = true;
+      }
+    }
+    
+    // 鲁棒性保障：如果变量模板中完全没有 [TEXT] 或 ${text} 占位符，
+    // 则说明该 Prompt 可能是旧版简单指令，我们需要在末尾追加待翻译文本。
+    if (context.text && !textReplaced) {
+        result = result.trim() + "\n\n" + context.text;
     }
     
     return result;

@@ -95,27 +95,26 @@ class BackendManager {
   /**
    * 委托调用底层引擎进行查词
    * @param {string} word - 单词
-   * @param {string} sourceLang - 源语言
-   * @param {string} targetLang - 目标语言
+   * @param {string} targetOverride - 全局目标语言设置 (auto/en/zh/...)
    * @param {Function} callback - 查询完成回调 (err, result)
    * @param {Function} progressCallback - 构建进度回调
    */
-  queryWord(word, sourceLang, targetLang, callback, progressCallback) {
+  queryWord(word, targetOverride, callback, progressCallback) {
     if (!this.activeBackend) {
       callback(new Error('Backend not initialized'), null);
       return;
     }
-    this.activeBackend.queryWord(word, sourceLang, targetLang, callback, progressCallback);
+    this.activeBackend.queryWord(word, targetOverride, callback, progressCallback);
   }
 
   /**
    * 委托调用专用的 Ollama 引擎进行图片识别与翻译 (路径隔离)
    * @param {string} imageData - 图片 DataURL/Base64
-   * @param {string} targetLang - 目标语言代码
+   * @param {string} targetOverride - 全局目标语言代码
    * @param {Function} callback - 回调
    * @param {Function} progressCallback - 进度回调
    */
-  queryImage(imageData, targetLang, callback, progressCallback) {
+  queryImage(imageData, targetOverride, callback, progressCallback) {
     const targetBackend = this._getOllamaBackend();
     if (!targetBackend) {
       callback(null, {
@@ -124,7 +123,8 @@ class BackendManager {
       });
       return;
     }
-    targetBackend.queryImage(imageData, targetLang, callback, progressCallback);
+    targetOverride = targetOverride || 'auto';
+    targetBackend.queryImage(imageData, targetOverride, callback, progressCallback);
   }
 
   /**

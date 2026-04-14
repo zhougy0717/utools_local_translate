@@ -3,6 +3,7 @@ const http = require('http');
 const https = require('https');
 const { OllamaConfig } = require('./config');
 const { PromptManager } = require('./prompt-manager');
+const targetLanguageDetector = require('../../utils/target_language_detector');
 
 
 /**
@@ -22,6 +23,7 @@ class OllamaBackend {
         this.workerStopping = false;
         this.currentAbortController = null;
         this.promptManager = new PromptManager();
+        this.detector = targetLanguageDetector;
     }
 
     /**
@@ -50,12 +52,11 @@ class OllamaBackend {
 
     /**
      * @param {string} text - 待翻译的原文本
-     * @param {string} sourceLang - 源语言代码 (例如 'en')
-     * @param {string} targetLang - 目标语言代码 (例如 'zh')
+     * @param {string} targetOverride - 目标语言设置 (auto 或 具体代码)
      * @param {function} callback - 完成回调 function(err, result)
      * @param {function} progressCallback - 进度回调 (用于展示查词状态)
      */
-    queryWord(text, sourceLang, targetLang, callback, progressCallback = null) {
+    queryWord(text, targetOverride, callback, progressCallback = null) {
         const queryId = Math.random().toString(36).substring(7);
         console.log(`[OllamaBackend][${queryId}] queryWord started for:`, text.substring(0, 10));
 
@@ -78,10 +79,18 @@ class OllamaBackend {
                 });
             }
 
-            // 构造稳健的翻译 Prompt (对齐进阶界面逻辑，防止输入被当成指令)
+            // 语种决策：由后端根据 globalTarget (targetOverride) 决定
+            let finalTarget = targetOverride;
+            if (!targetOverride || targetOverride === 'auto') {
+                const suggestion = this.detector.detect(text);
+                finalTarget = suggestion.target;
+            }
+
+            // 构造稳健的翻译 Prompt
             const fullPrompt = this.promptManager.getPrompt('advanced', {
                 text: text,
-                targetLangCode: targetLang
+                targetLangCode: finalTarget,
+                prompt: this.config.prompt // 注入用户自定义 Prompt
             });
 
             try {
@@ -166,11 +175,11 @@ class OllamaBackend {
     /**
      * 多模态图片识别与翻译
      * @param {string} imageData - 图片的 DataURL (Base64)
-     * @param {string} targetLang - 目标语言代码
+     * @param {string} targetOverride - 目标语言设置
      * @param {function} callback - (err, result)
      * @param {function} progressCallback - 进度更新
      */
-    queryImage(imageData, targetLang, callback, progressCallback = null) {
+    queryImage(imageData, targetOverride, callback, progressCallback = null) {
         const queryId = Math.random().toString(36).substring(7);
         console.log(`[OllamaBackend][${queryId}] queryImage started`);
 
@@ -183,7 +192,15 @@ class OllamaBackend {
                 this.reloadConfig();
             }
 
-            const visionPrompt = this.promptManager.getPrompt('vision', { targetLangCode: targetLang });
+            let finalTarget = targetOverride;
+            if (!targetOverride || targetOverride === 'auto') {
+                // 目前图片翻译默认使用目标语种建议（vision prompt 内部会再次尝试判定）
+                finalTarget = 'zh'; 
+            }
+
+            const visionPrompt = this.promptManager.getPrompt('vision', { 
+                targetLangCode: finalTarget 
+            });
 
             try {
                 // 确保图片数据包含正确的 Data URL 前缀（适配 OpenAI 兼容接口规范）

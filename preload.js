@@ -179,22 +179,19 @@ if (typeof window !== 'undefined') {
 
             // 步骤 2: 在 UI 线程确认清空后再渲染加载项，确保变更能被平滑捕捉
             setTimeout(() => {
-              const loadingMsg = BackendManager.getLoadingMessage();
-              console.log('[Preload] Rendering Loading Item:', loadingMsg);
-              callbackSetList(ViewPresenter.buildLoadingItem(loadingMsg));
-
               const targetOverride = appConfig.getTranslationTarget();
-              const { source, target, isZhToEn } = UtoolsHelper.detectLanguages(w, targetOverride);
-
-              // 步骤 3: 渲染 Loading 后的保障期。设置 300ms 延迟可有效防止后续可能产生的
-              // 同步阻塞任务（如大语言模型首包生成前的计算）直接抢占 UI 渲染帧，从而确保“搜索中”状态可见。
+              
+              // 步骤 3: 渲染 Loading 后的保障期
               setTimeout(() => {
                 const startTime = Date.now();
                 console.log('[Preload] Dispatching query to backend...');
-                BackendManager.queryWord(w, source, target, function (err, result) {
+                BackendManager.queryWord(w, targetOverride, function (err, result) {
                   const costMs = Date.now() - startTime;
                   console.log('[Preload] Result received from backend');
-                  callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
+                  
+                  // 重新启用语种显示建议
+                  const isZh = UtoolsHelper.isLikelyChinese(w);
+                  callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZh, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
                 }, function (progressMsg) {
                   callbackSetList(ViewPresenter.buildProgressItem(progressMsg));
                 });

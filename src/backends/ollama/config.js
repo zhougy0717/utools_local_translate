@@ -9,7 +9,7 @@ const OLLAMA_DEFAULTS = {
   apiKey: 'ollama',
   model: '',
   visionModel: '',
-  prompt: '你是一个专业的翻译助手。请将以下文本翻译为${target_lang}。只输出翻译结果，不要输出任何解释说明。',
+  prompt: '你是一个专业的翻译助手。请将以下文本翻译为 [TARGET_LANG]。只输出翻译结果，不要输出任何解释说明。\n\n[TEXT]',
   temperature: 0.1,
   useProxy: false
 };

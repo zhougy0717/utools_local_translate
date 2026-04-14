@@ -13,14 +13,14 @@ class TargetLanguageCommand {
         const currentTarget = appConfig.getTranslationTarget();
         const fuzzyInput = (subInput || '').trim().toLowerCase();
 
-        const items = SUPPORTED_LANGUAGES
+        const langItems = SUPPORTED_LANGUAGES
             .filter(lang => 
                 lang.name.toLowerCase().includes(fuzzyInput) || 
                 lang.code.toLowerCase().includes(fuzzyInput)
             )
             .map(lang => {
                 const isActive = lang.code === currentTarget;
-                const activeSuffix = isActive ? ' (🌟 当前设为目标)' : '';
+                const activeSuffix = isActive ? ' (🌟 当前)' : '';
                 
                 return {
                     title: `${lang.name}${activeSuffix}`,
@@ -29,15 +29,24 @@ class TargetLanguageCommand {
                     commandTrigger: this.trigger,
                     modeId: 'target',
                     langCode: lang.code,
+                    isActive: isActive, // 标记以便后续排序
                     icon: this.icon
                 };
             });
+
+        // 默认排序逻辑：当前选中的置顶（仅在无搜索关键词时，否则按搜索匹配）
+        if (!fuzzyInput) {
+            langItems.sort((a, b) => (b.isActive ? 1 : 0) - (a.isActive ? 1 : 0));
+        }
+
+        const items = [...langItems];
+        const currentLangName = SUPPORTED_LANGUAGES.find(l => l.code === currentTarget)?.name || currentTarget;
 
         // 粘性模式支持：在空输入时提供手动返回选项
         if (!fuzzyInput) {
             items.unshift({
                 title: '🔙 返回查词翻译',
-                description: '退出语言设置，返回主查询界面',
+                description: `当前全局目标语言：${currentLangName}`,
                 isCommandContext: true,
                 commandTrigger: this.trigger,
                 isReturnToMain: true,

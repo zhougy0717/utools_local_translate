@@ -135,7 +135,7 @@ class AppConfig {
    * @param {Object} config - 要保存的配置对象
    */
   save(config) {
-    const current = this.load();
+    const current = JSON.parse(JSON.stringify(this.load())); // 确保操作的是纯数据对象
     const merged = this._deepMerge(current, config);
     storageAdapter.setItem(this.storageKey, merged);
     this._cache = merged;
@@ -150,13 +150,16 @@ class AppConfig {
   _deepMerge(target, source) {
     const result = Object.assign({}, target);
     
-    if (source.backends) {
-      result.backends = Object.assign({}, target.backends || {}, source.backends);
+    // 如果是类实例，转为纯对象（安全保障）
+    const cleanSource = (source instanceof AppConfig) ? source.load() : source;
+
+    if (cleanSource.backends) {
+      result.backends = Object.assign({}, target.backends || {}, cleanSource.backends);
     }
     
-    Object.keys(source).forEach(key => {
+    Object.keys(cleanSource).forEach(key => {
       if (key !== 'backends') {
-        result[key] = source[key];
+        result[key] = cleanSource[key];
       }
     });
     
@@ -230,11 +233,19 @@ class AppConfig {
   }
 
   /**
-   * 设置当前激活的后端
+   * 设置当前激活的后端，并同步更新状态标志位
    * @param {string} name - 后端名称
    */
   setActiveBackend(name) {
-    this.save({ activeBackend: name });
+    const backends = {
+        offline_dict: name === 'offline_dict',
+        ollama: name === 'ollama',
+        libretranslate: name === 'libretranslate'
+    };
+    this.save({ 
+        activeBackend: name,
+        backends: backends
+    });
   }
 
   /**

@@ -5,6 +5,7 @@
 const path = require('path');
 const fs = require('fs');
 const { DictConfig } = require('./config');
+const targetLanguageDetector = require('../../utils/target_language_detector');
 const { DictDownloader } = require('./downloader');
 const { 
   buildAllDicts, 
@@ -269,11 +270,7 @@ function createDictBackend(options) {
         sharedConfigManager.save({ dictRepoPath: options.destDir });
         
         try {
-          const appCfg = appConfig.load();
-          appCfg.resourcePath = options.destDir;
-          if (typeof utools !== 'undefined') {
-              utools.dbStorage.setItem('app_config', appCfg);
-          }
+          appConfig.save({ resourcePath: options.destDir });
           
           const dictCfg = sharedConfigManager.load();
           const proxy = appConfig.getProxy(dictCfg.useProxy);
@@ -352,9 +349,8 @@ function createDictBackend(options) {
   if (!config.dictRepoPath) {
     // 强制要求配置路径
     return {
-      queryWord: function (word, sourceLang, targetLang, callback) {
-        if (typeof sourceLang === 'function') callback = sourceLang;
-        else if (typeof targetLang === 'function') callback = targetLang;
+      queryWord: function (word, targetOverride, callback) {
+        if (typeof targetOverride === 'function') callback = targetOverride;
         callback(null, { found: false, message: '请配置词典绝对路径，不配置无法使用' });
       },
       getConfigManager: function() {
@@ -427,27 +423,25 @@ function createDictBackend(options) {
 
   /**
    * @param {string} word
-   * @param {string} sourceLang
-   * @param {string} targetLang
+   * @param {string} targetOverride (忽略，离线词典强制使用中英探测)
    * @param {function(Error?, { found: boolean, translation?: string, phonetic?: string, message?: string }?)} callback
    */
-  function queryWord(word, sourceLang, targetLang, callback) {
-    if (typeof sourceLang === 'function') {
-      callback = sourceLang;
-      sourceLang = 'en';
-      targetLang = 'zh';
-    } else if (typeof targetLang === 'function') {
-      callback = targetLang;
-      targetLang = 'zh';
+  function queryWord(word, targetOverride, callback) {
+    if (typeof targetOverride === 'function') {
+      callback = targetOverride;
     } else if (typeof callback !== 'function') {
       callback = function () { };
     }
+    
     if (!word || !word.trim()) {
       callback(null, { found: false });
       return;
     }
     const w = word.trim();
-    const isZhToEn = sourceLang === 'zh' && targetLang === 'en';
+    
+    // 词典后端由内部探测器决定中英路由，忽略外部 targetOverride
+    const { source } = targetLanguageDetector.detect(w);
+    const isZhToEn = source === 'zh';
 
     if (isZhToEn) {
       function onCccedictResult(err, row) {

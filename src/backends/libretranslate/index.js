@@ -3,6 +3,7 @@ const fs = require('fs');
 const http = require('http');
 const https = require('https');
 const { LibreTranslateConfig } = require('./config');
+const targetLanguageDetector = require('../../utils/target_language_detector');
 
 /**
  * LibreTranslate API 翻译后端驱动
@@ -18,6 +19,7 @@ class LibreTranslateBackend {
             this.config = Object.assign({}, this.configManager.load(), config);
         }
         this.currentAbortController = null;
+        this.detector = targetLanguageDetector;
     }
 
     /**
@@ -38,15 +40,15 @@ class LibreTranslateBackend {
 
     /**
      * @param {string} text - 待翻译的原文本
-     * @param {string} sourceLang - 源语言代码 (例如 'en')
-     * @param {string} targetLang - 目标语言代码 (例如 'zh')
+     * @param {string} targetOverride - 目标语言设置 (auto 或 具体代码)
      * @param {function} callback - 完成回调 function(err, result)
      * @param {function} progressCallback - 进度回调 (不使用)
      */
-    queryWord(text, sourceLang, targetLang, callback, progressCallback = null) {
-        // 优先使用传入参数，否则使用配置中的默认值
-        const sLang = sourceLang || this.config.sourceLang || 'auto';
-        const tLang = targetLang || this.config.targetLang || 'zh';
+    queryWord(text, targetOverride, callback, progressCallback = null) {
+        // 语种决策：由探测器决定源语种，由探测器建议或全局设置决定目标语种
+        const suggestion = this.detector.detect(text);
+        const sLang = suggestion.source;
+        const tLang = (targetOverride && targetOverride !== 'auto') ? targetOverride : suggestion.target;
 
         // 使用配置的地址或默认本地地址
         const apiBase = this.config.apiBase || 'http://127.0.0.1:5000';
