@@ -54,7 +54,7 @@ function buildResultItems(searchWord, result, isZhToEn, costTime, backendName = 
   const targetLangCode = isZhToEn ? 'en' : 'zh';
   list.push({
     title: '✨ 使用 Ollama 进阶翻译...',
-    description: '基于 AI 提供深度润色、语法剖析与多风格翻译',
+    description: '基于 AI 提供深度润色、变量命名、识图翻译与多风格支持',
     isAdvancedOllama: true,
     ocrText: result.ocrText || '',
     ocrImage: imageData, // [NEW] 透传预处理后的图片数据
