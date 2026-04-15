@@ -34,14 +34,14 @@ module.exports = {
 
         if (itemData.action === 'open_docs') {
             if (typeof utools !== 'undefined') {
-                utools.shellOpenExternal('https://github.com'); // TODO: Replace with real URL later if available
+                utools.shellOpenExternal('https://github.com/zhougy0717/utools_local_translate');
             }
             return { restoreSearch: true };
         }
 
         if (itemData.action === 'open_issues') {
             if (typeof utools !== 'undefined') {
-                utools.shellOpenExternal('https://github.com'); // TODO: Replace with real URL later if available
+                utools.shellOpenExternal('https://github.com/zhougy0717/utools_local_translate/issues');
             }
             return { restoreSearch: true };
         }

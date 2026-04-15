@@ -1,70 +1,68 @@
-# 本地词典 / 中英翻译（uTools 插件）
+# uTools 局部/本地全能翻译中心
 
-uTools 列表模式插件：输入单词或中文，自动识别语言并查词（英→中 / 中→英）。
+一个强大、私密且多功能的 uTools 本地翻译插件。结合了传统词典的高能效与现代 AI 的深度理解能力。
 
-## 功能
+## 🌟 核心特性
 
-- **英→中**：输入英文单词，查询 ecdict 词库，展示释义与音标。
-- **中→英**：输入中文（或含中文），查询 CC-CEDICT 词库，展示英文释义与拼音。
-- 输入框会根据是否包含中文自动选择查词方向，无需手动切换。
+- **多模式无缝切换**
+  - **离线词典 (Offline Dict)**：基于 ECDICT 与 CC-CEDICT，毫秒级响应，支持英中/中英双向查词。
+  - **AI 进阶翻译 (Ollama)**：支持本地 LLM (如 Llama3, Qwen) 或 OpenAI 兼容 API，提供地道润色与深度剖析。
+  - **LibreTranslate**：支持自建开源翻译服务，兼顾隐私与多语种能力。
 
-## 词库（双 SQLite 数据库）
+- **Ollama 进阶翻译中心**
+  - **深度润色**：不仅仅是翻译，更能优化语义，提供语法剖析。
+  - **变量命名**：专为开发者设计，一键生成 Pascal, Camel, Snake, Constant, Kebab 等多种风格。
+  - **识图翻译 (Vision)**：支持多模态识图，直接对图片内容进行 OCR 识别并翻译。
 
-- **英→中**：`resources/ecdict.db`（表 `stardict`）；**中→英**：`resources/cccedict.db`（表 `cccedict`）。
+- **智能体验**
+  - **自动语种侦测**：智能判断中英方向，无需手动干预。
+  - **Sticky Mode**：保持指令上下文，实现极致顺滑的 sub-input 交互。
+  - **全局代理支持**：内置 HTTP/SOCKS5 代理配置（支持认证），解决网络访问难题。
 
-## 维护者：构建词库与分发
+## ⌨️ 快捷指令 (Slash Commands)
 
-### 生成 cccedict.db
+在搜索框输入 `/` 即可触发指令列表：
 
-中→英词库由 CC-CEDICT 数据生成。维护者发布新版本前，可运行项目内 Python 脚本从网络下载 CC-CEDICT 并生成 `resources/cccedict.db`。
+- `/mode`：切换翻译后端（离线词典、Ollama、LibreTranslate）。
+- `/target`：设定全局目标语言（支持自动记忆）。
+- `/source`：手动指定源语言（适用于特定后端）。
+- `/help`：快速查看使用技巧与文档链接。
 
-**运行方式（在项目根目录）：**
+## ⚙️ 快速开始
 
+### 1. 离线词典资源获取
+
+插件支持词典自动下载与构建。如果需要手动配置，请将 `ecdict.db` 或 `cccedict.db` 放入资源目录，或通过 `/mode` 触发自动处理流程。
+
+### 2. Ollama 配置
+
+1. 确保本地已安装并运行 [Ollama](https://ollama.com/)。
+2. 在插件 `/mode` 中选择 Ollama。
+3. 进入配置界面，输入 API 地址（默认 `http://127.0.0.1:11434/v1`）并选择已下载的模型。
+
+## 🛠 开发者指南
+
+### 构建词库
 ```bash
-python3 scripts/build_cccedict.py
+python3 scripts/build_cccedict.py  # 构建中英词库
+python3 scripts/split_dict.py      # 处理分卷词库
 ```
 
-- 默认从 MDBG 官方下载 CC-CEDICT（UTF-8 GZip），解析并写入 `resources/cccedict.db`。
-- 可选参数：
-  - `--output <路径>`：指定输出 SQLite 文件路径（默认 `resources/cccedict.db`）。
-  - `--url <URL>`：指定下载地址（默认 MDBG 官方链接）。
-
-详见 `scripts/build_cccedict.py` 内注释。
-
-### 分卷处理（用于 Gitee 下载）
-
-为了绕过 Gitee 的文件大小限制，词典数据库需要分卷打包：
-
+### 运行测试
 ```bash
-python3 scripts/split_dict.py
+npm test
 ```
 
-- 该脚本会将 `resources/ecdict.db` 压缩并分割为多个分卷。详见相关设计文档。
-
-## 打包发布
-
-运行发布脚本准备发布包：
-
+### 打包发布
 ```bash
 python3 scripts/release.py
 ```
 
-- 该脚本会精简 `node_modules` 并拷贝必要文件到 `release/` 目录。
-- **注意**：插件已支持自动下载功能，发布包本身不强制包含庞大的词典文件。
+## 📄 开源说明
 
-## 离线词典资源下载指南
+- **英中词典**：采用 [ECDICT](https://github.com/skywind3000/ECDICT) 数据。
+- **中英词典**：数据源自 [MDBG Chinese Dictionary](https://www.mdbg.net/chinese/dictionary?page=cedict)。
+- **License**：MIT
 
-对于资源缺失或自主配置插件资源目录的用户，请按以下步骤获取词典：
-
-1. **英→中词典 (ecdict.db)**
-   - **下载来源**：[skywind3000/ECDICT](https://github.com/skywind3000/ECDICT)的Release页面[ ecdict-sqlite-28.zip](https://github.com/skywind3000/ECDICT-ultimate/releases/download/1.0.0/ecdict-sqlite-28.zip)
-   - **安装方法**：将下载后的 `.zip` 文件直接存放于插件的本地资源目录（在插件中输入 `/path` 命令可配置或查看该本地路径）。然后在插件内通过 `/mode` 命令触发词典自动解压与构建即可，提取成功后旧的包将自动清理。
-
-2. **中→英词典 (cccedict.db)**
-   - **下载来源**：中英词典由开源项目 [MDBG Chinese Dictionary](https://www.mdbg.net/chinese/dictionary?page=cedict) 提供数据。
-   - **安装方法**：将下载的cedict_1_0_ts_utf-8_mdbg.zip直接放入插件的本地资源目录（在插件中输入 `/path` 命令可配置或查看该本地路径）。然后在插件内通过 `/mode` 命令触发词典自动解压与构建即可，提取成功后旧的包将自动清理。
-
-## 开发与测试
-
-- 单元测试：`node --test test/isLikelyChinese.test.js test/ecdict.test.js`
-- 设计文档：见 `doc/spec/spec-00001-ecdict.md`、`doc/spec/spec-00002-chinese-to-english.md`、`doc/spec/spec-00003-zipped-dict.md`。
+---
+**提交问题或建议**：[GitHub Issues](https://github.com/zhougy0717/utools_local_translate/issues)
