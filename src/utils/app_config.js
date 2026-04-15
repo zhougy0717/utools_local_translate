@@ -194,7 +194,9 @@ class AppConfig {
     let auth = '';
     if (p.authEnabled && p.username) {
       const password = this.getProxyPassword();
-      auth = password ? `${p.username}:${password}@` : `${p.username}@`;
+      const encodedUser = encodeURIComponent(String(p.username || ''));
+      const encodedPass = password ? encodeURIComponent(String(password)) : '';
+      auth = encodedPass ? `${encodedUser}:${encodedPass}@` : `${encodedUser}@`;
     }
     
     const type = p.type === 'socks5' ? 'socks5' : 'http';

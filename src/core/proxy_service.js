@@ -87,9 +87,10 @@ class ProxyService extends EventEmitter {
     if (config.enabled && config.host && config.port) {
       let auth = '';
       if (config.authEnabled && config.username) {
-        // 如果传入了新密码则用新密码，否则用存储的密码
         const pass = (config.password !== undefined) ? config.password : appConfig.getProxyPassword();
-        auth = pass ? `${config.username}:${pass}@` : `${config.username}@`;
+        const encodedUser = encodeURIComponent(String(config.username || ''));
+        const encodedPass = pass ? encodeURIComponent(String(pass)) : '';
+        auth = encodedPass ? `${encodedUser}:${encodedPass}@` : `${encodedUser}@`;
       }
       
       const proxyUrl = `${config.type}://${auth}${config.host}:${config.port}`;
