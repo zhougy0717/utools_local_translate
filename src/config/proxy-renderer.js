@@ -81,26 +81,57 @@ function getFormData() {
     };
 }
 
+/**
+ * 内部保存逻辑：验证并执行存盘
+ * @returns {Promise<boolean>} 是否保存成功
+ */
+async function performSave() {
+    const data = getFormData();
+    
+    // 如果填写了任何一项，校验必填项
+    if (data.host || data.port) {
+        if (!data.host || !data.port) {
+            showResult('请完整填写代理地址和端口', 'error');
+            return false;
+        }
+        if (data.authEnabled && !data.username) {
+            showResult('启用了认证但未填写用户名', 'error');
+            return false;
+        }
+    }
+
+    try {
+        const { password, ...config } = data;
+        await _proxyAPI.saveProxyConfig(config, password);
+        return true;
+    } catch (e) {
+        showResult('保存失败: ' + e.message, 'error');
+        return false;
+    }
+}
+
 // 绑定事件
 dom.authEnabled.addEventListener('change', toggleAuthFields);
 
 dom.btnTest.addEventListener('click', async () => {
+    // 1. 先执行保存逻辑 (尊重用户显式行为：测试即认可当前输入有效)
+    const saved = await performSave();
+    if (!saved) return;
+    
+    // 2. 获取最新数据发起测试
     const data = getFormData();
-    if (!data.host || !data.port) {
-        showResult('请先填写代理地址和端口', 'error');
-        return;
-    }
 
     dom.btnTest.classList.add('btn-loading');
     dom.btnTest.disabled = true;
-    showResult('加速测试中，请稍候...', 'success');
+    showResult('配置已保存，正在测试连通性...', 'success');
 
     try {
         const result = await _proxyAPI.testConnection(data);
         if (result.success) {
-            showResult(`测试成功！响应时间: ${result.time}ms`, 'success');
+            showResult(`配置已保存，测试成功！响应时间: ${result.time}ms`, 'success');
         } else {
-            showResult(`连接失败: ${result.error}`, 'error');
+            // 注意：连接失败依然保留“配置已保存”的提示文字
+            showResult(`配置已保存，但连接测试未通过: ${result.error}`, 'error');
         }
     } catch (e) {
         showResult('系统错误: ' + e.message, 'error');
@@ -111,26 +142,9 @@ dom.btnTest.addEventListener('click', async () => {
 });
 
 dom.btnSave.addEventListener('click', async () => {
-    const data = getFormData();
-    
-    // 如果填写了任何一项，校验必填项
-    if (data.host || data.port) {
-        if (!data.host || !data.port) {
-            showResult('请完整填写代理地址和端口', 'error');
-            return;
-        }
-        if (data.authEnabled && !data.username) {
-            showResult('启用了认证但未填写用户名', 'error');
-            return;
-        }
-    }
-
-    try {
-        const { password, ...config } = data;
-        await _proxyAPI.saveProxyConfig(config, password);
+    const saved = await performSave();
+    if (saved) {
         showResult('配置已保存', 'success');
-    } catch (e) {
-        showResult('保存失败: ' + e.message, 'error');
     }
 });
 
