@@ -38,8 +38,20 @@ let sharedConfigManager = null;
  * @returns {Object} { status, path, details }
  */
 function getDictStatus(appConfig) {
-  appConfig = appConfig || {};
-  const repoPath = appConfig.resourcePath || appConfig.dictRepoPath;
+  // [FIX] 增强鲁棒性：处理可能的 AppConfig 实例并提供兜底加载逻辑
+  const configData = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+  let repoPath = configData.resourcePath || configData.dictRepoPath;
+
+  if (!repoPath) {
+    // 兜底方案：如果传入对象中没有提取到路径，尝试从专用的 DictConfig 中加载
+    try {
+      if (!sharedConfigManager) sharedConfigManager = new DictConfig();
+      const specificConfig = sharedConfigManager.load();
+      repoPath = specificConfig.dictRepoPath;
+    } catch (e) {
+      console.warn('[DictStatus] Failed to load DictConfig fallback:', e);
+    }
+  }
 
   if (!repoPath) {
     return { status: DICT_STATUS.UNAVAILABLE, path: '', details: { ecdict: false, cccedict: false } };

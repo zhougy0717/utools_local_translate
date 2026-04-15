@@ -32,7 +32,9 @@ class OllamaHandler {
     }
 
     getSearchItemData(appConfig) {
-        const { status, config } = this._getStatus(appConfig);
+        // [FIX] 确保处理的是配置数据对象，而非 AppConfig 实例
+        const configData = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        const { status, config } = this._getStatus(configData);
         let statusText = '未知状态';
         let statusPrefix = '⚠️';
 
@@ -43,7 +45,7 @@ class OllamaHandler {
             statusText = '未配置 API 地址或模型';
         }
 
-        const isActive = !!(appConfig.backends && appConfig.backends.ollama);
+        const isActive = !!(configData.backends && configData.backends.ollama);
         const activeSuffix = isActive ? ' (已激活 🌟)' : '';
 
         return {
@@ -57,8 +59,11 @@ class OllamaHandler {
     }
 
     handleSelect(itemData, appConfig, callbackSetList) {
+        // [FIX] 统一获取最新的配置数据
+        const configData = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        
         if (!itemData.action) {
-            const { config } = this._getStatus(appConfig);
+            const { config } = this._getStatus(configData);
             const modelName = config.model || '未选择模型';
             const apiBase = config.apiBase || '未配置地址';
 

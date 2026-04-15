@@ -38,7 +38,9 @@ class LibreTranslateHandler {
     }
 
     getSearchItemData(appConfig) {
-        const { status, config } = this._getStatus(appConfig);
+        // [FIX] 确保处理的是配置数据对象，而非 AppConfig 实例
+        const configData = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        const { status, config } = this._getStatus(configData);
         let statusText = '未知状态';
         let statusPrefix = '⚠️';
 
@@ -46,10 +48,10 @@ class LibreTranslateHandler {
             statusText = 'API 已就绪';
             statusPrefix = '✅';
         } else {
-            statusText = '未配置服务地址';
+            statusText = '未配置 service 地址';
         }
 
-        const isActive = !!(appConfig.backends && appConfig.backends.libretranslate);
+        const isActive = !!(configData.backends && configData.backends.libretranslate);
         const activeSuffix = isActive ? ' (已激活 🌟)' : '';
 
         return {
@@ -63,8 +65,11 @@ class LibreTranslateHandler {
     }
 
     handleSelect(itemData, appConfig, callbackSetList) {
+        // [FIX] 统一获取最新的配置数据
+        const configData = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        
         if (!itemData.action) {
-            const { config } = this._getStatus(appConfig);
+            const { config } = this._getStatus(configData);
             const apiBase = config.apiBase || '未配置地址';
 
             callbackSetList([

@@ -24,7 +24,10 @@ class OfflineDictHandler {
     }
 
     getSearchItemData(appConfig) {
-        const dictInfo = getDictStatus(appConfig);
+        // [FIX] 确保处理的是配置数据对象，而非 AppConfig 实例
+        const config = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        const dictInfo = getDictStatus(config);
+        
         let statusText = '未知状态';
         let statusPrefix = '⚠️';
         let currentStatus = dictInfo.status;
@@ -42,7 +45,7 @@ class OfflineDictHandler {
             statusText = '未配置或未下载';
         }
 
-        const isActive = !!(appConfig.backends && appConfig.backends.offline_dict);
+        const isActive = !!(config.backends && config.backends.offline_dict);
         const activeSuffix = isActive ? ' (已激活 🌟)' : '';
 
         return {
@@ -56,10 +59,12 @@ class OfflineDictHandler {
     }
 
     handleSelect(itemData, appConfig, callbackSetList) {
+        // [FIX] 统一获取最新的配置数据
+        const config = (appConfig && typeof appConfig.load === 'function') ? appConfig.load() : (appConfig || {});
+        
         // 1. 如果没有 action，展示二级菜单
         if (!itemData.action) {
-            const liveAppConfig = (typeof utools !== 'undefined' ? utools.dbStorage.getItem('app_config') : null) || appConfig;
-            const dictInfo = getDictStatus(liveAppConfig);
+            const dictInfo = getDictStatus(config);
             const statusLabel = dictInfo.status === STATUS.READY ? '✅ 数据已就绪' : '⚠️ 数据未就绪';
 
             callbackSetList([
