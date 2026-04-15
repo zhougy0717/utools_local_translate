@@ -402,6 +402,16 @@ async function init() {
     Bridge.saveConfig(configToUpdate);
     console.log(`[Advanced] Saved ${currentTask === 'ocr' ? 'visionModel' : 'model'}: ${selectedModel}`);
   });
+
+  // [NEW] 核心策略：如果是从其他后端（如 离线词典/LibreTranslate）跳转过来的，
+  // 为了让用户即刻感知到 Ollama 的深度翻译/润色能力，在进入页面时自动发起查询
+  const isNonOllamaSource = config.initialBackendName && !config.initialBackendName.toLowerCase().includes('ollama');
+  const hasSourceText = UI.sourceInput.value.trim().length > 0;
+  
+  if (isNonOllamaSource && hasSourceText && currentTask === 'advanced') {
+      console.log('[Advanced] Non-Ollama source detected, triggering auto-translate...');
+      handleTask();
+  }
 }
 
 // 记录原文是否被手动编辑过，用于 OCR 模式下的降级逻辑
