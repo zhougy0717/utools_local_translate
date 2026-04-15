@@ -26,6 +26,11 @@ class BackendManager {
     }
     
     this.currentConfig = config;
+    
+    // [NEW] 如果已经创建了专用的 Ollama 后端（用于进阶任务），强制其重载最新配置
+    if (this._dedicatedOllamaBackend) {
+      this._dedicatedOllamaBackend.reloadConfig();
+    }
 
     // 订阅代理变更事件 (仅注册一次)
     if (!this._proxyListenerAdded) {
@@ -233,14 +238,15 @@ class BackendManager {
    * @private
    */
   _getOllamaBackend() {
-    // 方案：如果当前 activeBackend 就是 Ollama，直接复用；否则从配置中创建一个专用实例。
-    if (this.activeBackend && this.activeBackend.constructor.name === 'OllamaBackend') {
+    // 1. 如果当前主后端就是 Ollama，直接复用
+    if (this.activeBackend && this.activeBackend.backendId === 'ollama') {
       return this.activeBackend;
     }
+    
+    // 2. 否则，确保存在一个专用的、持久化的 Ollama 后端对象（用于进阶任务）
     if (!this._dedicatedOllamaBackend) {
-      if (this.currentConfig && this.currentConfig.ollama) {
-        this._dedicatedOllamaBackend = createOllamaBackend(this.currentConfig.ollama);
-      }
+       console.log('[BackendManager] Initializing dedicated Ollama backend for advanced tasks');
+       this._dedicatedOllamaBackend = createOllamaBackend();
     }
     return this._dedicatedOllamaBackend;
   }

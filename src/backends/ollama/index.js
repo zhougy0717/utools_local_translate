@@ -12,6 +12,7 @@ const targetLanguageDetector = require('../../utils/target_language_detector');
  */
 class OllamaBackend {
     constructor(config = {}) {
+        this.backendId = 'ollama';
         // 优先使用传入的配置，否则从存储加载
         if (config instanceof OllamaConfig) {
             this.configManager = config;
