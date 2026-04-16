@@ -40,6 +40,17 @@ class UtoolsStorage {
     return this._storage;
   }
 
+  /**
+   * 获取机器唯一标识，用于区分不同电脑上的本地配置
+   * @returns {string} 机器标识
+   */
+  getNativeId() {
+    if (typeof utools !== 'undefined' && typeof utools.getNativeId === 'function') {
+      return utools.getNativeId();
+    }
+    return 'default_machine';
+  }
+
   getItem(key) {
     return this.getStorage().getItem(key);
   }

@@ -11,7 +11,7 @@ const DICT_DEFAULTS = {
 
 class DictConfig extends AbstractBackendConfig {
   constructor() {
-    super('backend_dict', DICT_DEFAULTS);
+    super('backend_dict', DICT_DEFAULTS, ['dictRepoPath']);
   }
 }
 

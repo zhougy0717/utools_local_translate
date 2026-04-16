@@ -69,11 +69,15 @@ function showResult(message, type) {
  * 获取当前表单数据
  */
 function getFormData() {
+    let host = dom.host.value.trim();
+    // 支持同时配置或不配置 http(s):// 头
+    host = host.replace(/^https?:\/\//i, '');
+    
     return {
         enabled: true, // 始终返回 true 确保底层 getProxy() 能读取
         authEnabled: dom.authEnabled.checked,
         type: dom.type.value,
-        host: dom.host.value.trim(),
+        host: host,
         port: dom.port.value.trim(),
         username: dom.username.value.trim(),
         password: dom.password.value, // 密码不 trim

@@ -93,7 +93,8 @@ class ProxyService extends EventEmitter {
         auth = encodedPass ? `${encodedUser}:${encodedPass}@` : `${encodedUser}@`;
       }
       
-      const proxyUrl = `${config.type}://${auth}${config.host}:${config.port}`;
+      const cleanHost = String(config.host || '').replace(/^https?:\/\//i, '');
+      const proxyUrl = `${config.type}://${auth}${cleanHost}:${config.port}`;
       
       if (config.type === 'socks5') {
         try {

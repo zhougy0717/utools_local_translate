@@ -31,7 +31,16 @@ class AppConfig {
   constructor() {
     this.storageKey = 'app_config';
     this.defaults = APP_CONFIG_DEFAULTS;
+    this.localKeys = ['resourcePath'];
     this._cache = null;
+  }
+
+  /**
+   * 获取本地存储的 Key
+   * @returns {string}
+   */
+  _getLocalKey() {
+    return `${this.storageKey}_local_${storageAdapter.getNativeId()}`;
   }
 
   /**
@@ -43,14 +52,37 @@ class AppConfig {
       return this._cache;
     }
 
+    // 1. 加载常规存储 (同步部分)
     const stored = storageAdapter.getItem(this.storageKey);
+    let config;
     if (stored) {
       // 执行向后兼容迁移
       const migrated = this._migrateProxy(stored);
-      this._cache = this._mergeDefaults(migrated);
+      config = this._mergeDefaults(migrated);
     } else {
-      this._cache = JSON.parse(JSON.stringify(this.defaults));
+      config = JSON.parse(JSON.stringify(this.defaults));
     }
+
+    // [IMPORTANT] 剔除同步配置中可能存在的本地键 (针对历史同步数据的兜底)
+    if (this.localKeys.length > 0) {
+      this.localKeys.forEach(key => {
+        delete config[key];
+      });
+    }
+
+    // 2. 加载本地存储 (非同步部分)
+    if (this.localKeys.length > 0) {
+      const localStored = storageAdapter.getItem(this._getLocalKey());
+      if (localStored) {
+        this.localKeys.forEach(key => {
+          if (localStored[key] !== undefined) {
+            config[key] = localStored[key];
+          }
+        });
+      }
+    }
+
+    this._cache = config;
     return this._cache;
   }
 
@@ -137,7 +169,28 @@ class AppConfig {
   save(config) {
     const current = JSON.parse(JSON.stringify(this.load())); // 确保操作的是纯数据对象
     const merged = this._deepMerge(current, config);
-    storageAdapter.setItem(this.storageKey, merged);
+    
+    // 1. 分离同步和本地配置
+    const sharedConfig = JSON.parse(JSON.stringify(merged));
+    const localConfig = {};
+    let hasLocal = false;
+
+    if (this.localKeys.length > 0) {
+      this.localKeys.forEach(key => {
+        if (merged[key] !== undefined) {
+          localConfig[key] = merged[key];
+          delete sharedConfig[key];
+          hasLocal = true;
+        }
+      });
+    }
+
+    // 2. 保存到各自存储
+    storageAdapter.setItem(this.storageKey, sharedConfig);
+    if (hasLocal) {
+      storageAdapter.setItem(this._getLocalKey(), localConfig);
+    }
+
     this._cache = merged;
   }
 
@@ -200,7 +253,8 @@ class AppConfig {
     }
     
     const type = p.type === 'socks5' ? 'socks5' : 'http';
-    return `${type}://${auth}${p.host}:${p.port}`;
+    const cleanHost = String(p.host || '').replace(/^https?:\/\//i, '');
+    return `${type}://${auth}${cleanHost}:${p.port}`;
   }
 
   /**
