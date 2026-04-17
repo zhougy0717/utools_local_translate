@@ -369,7 +369,8 @@ function createDictBackend(options) {
         return sharedConfigManager;
       },
       openConfigPanel: openConfigPanelFn,
-      closePanel: closePanelFn
+      closePanel: closePanelFn,
+      stopWorker: function() {} // 未配置时不需清理
     };
   }
 
@@ -377,6 +378,10 @@ function createDictBackend(options) {
   const cccedictDbPath = path.join(config.dictRepoPath, CCCEDICT_DB);
 
   let sqlPromise = null;
+  let ecdictDbInstance = null;
+  let cccedictDbInstance = null;
+  let ecdictLoadingPromise = null;
+  let cccedictLoadingPromise = null;
 
   /**
    * 内部 SQL.js 初始化助手 (实现单例缓存)
@@ -392,16 +397,59 @@ function createDictBackend(options) {
     return sqlPromise;
   }
 
+  /**
+   * 获取并缓存 ECDICT 数据库实例
+   */
+  async function _getEcdictDb() {
+    if (ecdictDbInstance) return ecdictDbInstance;
+    if (ecdictLoadingPromise) return ecdictLoadingPromise;
+
+    ecdictLoadingPromise = (async () => {
+      try {
+        const SQL = await _getSqlJs();
+        if (!fs.existsSync(dbPath)) throw new Error('缺少 ecdict.db');
+        // 使用异步读取，避免在加载超大文件时彻底卡死主线程
+        const fileBuffer = await fs.promises.readFile(dbPath);
+        ecdictDbInstance = new SQL.Database(fileBuffer);
+        return ecdictDbInstance;
+      } catch (err) {
+        ecdictLoadingPromise = null;
+        throw err;
+      }
+    })();
+    return ecdictLoadingPromise;
+  }
+
+  /**
+   * 获取并缓存 CC-CEDICT 数据库实例
+   */
+  async function _getCccedictDb() {
+    if (cccedictDbInstance) return cccedictDbInstance;
+    if (cccedictLoadingPromise) return cccedictLoadingPromise;
+
+    cccedictLoadingPromise = (async () => {
+      try {
+        const SQL = await _getSqlJs();
+        if (!fs.existsSync(cccedictDbPath)) throw new Error('缺少 cccedict.db');
+        const fileBuffer = await fs.promises.readFile(cccedictDbPath);
+        cccedictDbInstance = new SQL.Database(fileBuffer);
+        return cccedictDbInstance;
+      } catch (err) {
+        cccedictLoadingPromise = null;
+        throw err;
+      }
+    })();
+    return cccedictLoadingPromise;
+  }
+
   async function queryWithSqlJs(word, callback) {
     try {
-      const SQL = await _getSqlJs();
-      const fileBuffer = fs.readFileSync(dbPath);
-      const db = new SQL.Database(fileBuffer);
+      const db = await _getEcdictDb();
       const safeWord = word.replace(/'/g, "''");
       const res = db.exec(
         "SELECT translation, phonetic FROM stardict WHERE word = '" + safeWord + "' COLLATE NOCASE LIMIT 1"
       );
-      db.close();
+      // 注意：不再调用 db.close()，因为实例是共享的
       if (res.length && res[0].values.length) {
         const row = res[0].values[0];
         callback(null, { translation: row[0] || '', phonetic: row[1] || '' });
@@ -415,9 +463,7 @@ function createDictBackend(options) {
 
   async function queryCccedictWithSqlJs(word, callback) {
     try {
-      const SQL = await _getSqlJs();
-      const fileBuffer = fs.readFileSync(cccedictDbPath);
-      const db = new SQL.Database(fileBuffer);
+      const db = await _getCccedictDb();
       const stmt = db.prepare('SELECT english, pinyin FROM cccedict WHERE simplified = ? OR traditional = ? LIMIT 1');
       stmt.bind([word, word]);
       let row = null;
@@ -426,7 +472,7 @@ function createDictBackend(options) {
         row = { translation: obj.english || '', phonetic: obj.pinyin || '' };
       }
       stmt.free();
-      db.close();
+      // 注意：不再调用 db.close()，因为实例是共享的
       callback(null, row);
     } catch (e) {
       callback(e);
@@ -522,7 +568,19 @@ function createDictBackend(options) {
       return sharedConfigManager;
     },
     openConfigPanel: openConfigPanelFn,
-    closePanel: closePanelFn
+    closePanel: closePanelFn,
+    stopWorker: function() {
+      if (ecdictDbInstance) {
+        try { ecdictDbInstance.close(); } catch(e) {}
+        ecdictDbInstance = null;
+      }
+      if (cccedictDbInstance) {
+        try { cccedictDbInstance.close(); } catch(e) {}
+        cccedictDbInstance = null;
+      }
+      ecdictLoadingPromise = null;
+      cccedictLoadingPromise = null;
+    }
   };
 }
 

@@ -37,7 +37,9 @@ function applyEnterWithWord(word, callbackSetList) {
   // 给 UI 进程 100ms 时间用于优先在查询前渲染上面的"请稍候"列表项
   setTimeout(() => {
     const startTime = Date.now();
-    BackendManager.queryWord(w, source, target, function (err, result) {
+    // [FIX] 修复参数签名：BackendManager.queryWord 接受 (word, targetOverride, callback, progressCallback)
+    // 这里 targetOverride 应该使用探测出的 target (或用户设置的 target)
+    BackendManager.queryWord(w, target, function (err, result) {
       const costMs = Date.now() - startTime;
       callbackSetList(ViewPresenter.buildResultItems(w, result || { found: false }, isZhToEn, costMs, BackendManager.getBackendName(), appConfig.shouldShowTranslationCost()));
     }, function (progressMsg) {
