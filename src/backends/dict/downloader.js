@@ -77,6 +77,7 @@ class DictDownloader {
     }
     this.destDir = options.destDir;
     this.proxy = options.proxy || null;
+    this.sslVerify = options.sslVerify ?? false;
     this.agent = null;
 
     // 如果配置了代理，创建 Agent
@@ -86,7 +87,7 @@ class DictDownloader {
           const { SocksProxyAgent } = require('socks-proxy-agent');
           this.agent = new SocksProxyAgent(this.proxy);
         } else {
-          this.agent = new HttpsProxyAgent(this.proxy);
+          this.agent = new HttpsProxyAgent(this.proxy, { rejectUnauthorized: !!this.sslVerify });
         }
       } catch (e) {
         console.error('Failed to create proxy agent:', e);
@@ -188,7 +189,8 @@ class DictDownloader {
         timeout: DOWNLOAD_TIMEOUT,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-        }
+        },
+        rejectUnauthorized: !!this.sslVerify
       };
 
       // 如果有已下载的部分，添加 Range 头

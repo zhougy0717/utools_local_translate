@@ -12,7 +12,8 @@ const dom = {
     btnSave: document.getElementById('btn-save'),
     resultMessage: document.getElementById('result-message'),
     proxyFields: document.getElementById('proxy-fields'),
-    authFields: document.getElementById('auth-fields')
+    authFields: document.getElementById('auth-fields'),
+    sslVerify: document.getElementById('proxy-ssl-verify')
 };
 
 /**
@@ -22,6 +23,7 @@ async function loadConfig() {
     try {
         const config = await _proxyAPI.getProxyConfig();
         dom.authEnabled.checked = !!config.authEnabled;
+        dom.sslVerify.checked = !!config.sslVerify;
         dom.type.value = config.type || 'http';
         dom.host.value = config.host || '';
         dom.port.value = config.port || '';
@@ -81,7 +83,8 @@ function getFormData() {
         port: dom.port.value.trim(),
         username: dom.username.value.trim(),
         password: dom.password.value, // 密码不 trim
-        testUrl: dom.testUrl.value.trim()
+        testUrl: dom.testUrl.value.trim(),
+        sslVerify: dom.sslVerify.checked
     };
 }
 

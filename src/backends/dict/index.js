@@ -285,11 +285,13 @@ function createDictBackend(options) {
           appConfig.save({ resourcePath: options.destDir });
           
           const dictCfg = sharedConfigManager.load();
+          const proxyConfig = appConfig.load().proxy || {};
           const proxy = appConfig.getProxy(dictCfg.useProxy);
 
           const downloadOptions = {
             destDir: options.destDir,
             proxy: proxy,
+            sslVerify: !!proxyConfig.sslVerify,
             onProgress(progress, phase) {
               if (typeof progress === 'string') {
                   onProgress({ phase: 'building', dict: phase === 'ecdict' ? 'ecdict' : 'cccedict', percent: 90, downloaded: 0, total: 0, message: progress });

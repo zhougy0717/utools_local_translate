@@ -13,7 +13,8 @@ const APP_CONFIG_DEFAULTS = {
     host: '',
     port: '',
     username: '',
-    testUrl: 'https://www.google.com'
+    testUrl: 'https://www.google.com',
+    sslVerify: false
   },
   activeBackend: 'offline_dict',
   showTranslationCost: true,

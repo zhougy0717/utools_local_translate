@@ -106,7 +106,7 @@ class ProxyService extends EventEmitter {
         }
       } else {
         try {
-          agent = new HttpsProxyAgent(proxyUrl);
+          agent = new HttpsProxyAgent(proxyUrl, { rejectUnauthorized: !!config.sslVerify });
         } catch (e) {
           console.error('[ProxyService] HttpsProxyAgent error:', e);
           return { success: false, error: '代理 Agent 创建失败: ' + e.message };
