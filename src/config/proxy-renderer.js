@@ -23,7 +23,7 @@ async function loadConfig() {
     try {
         const config = await _proxyAPI.getProxyConfig();
         dom.authEnabled.checked = !!config.authEnabled;
-        dom.sslVerify.checked = !!config.sslVerify;
+        dom.sslVerify.checked = config.sslVerify === false;
         dom.type.value = config.type || 'http';
         dom.host.value = config.host || '';
         dom.port.value = config.port || '';
@@ -84,7 +84,7 @@ function getFormData() {
         username: dom.username.value.trim(),
         password: dom.password.value, // 密码不 trim
         testUrl: dom.testUrl.value.trim(),
-        sslVerify: dom.sslVerify.checked
+        sslVerify: !dom.sslVerify.checked
     };
 }
 

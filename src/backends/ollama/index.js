@@ -4,6 +4,7 @@ const https = require('https');
 const { OllamaConfig } = require('./config');
 const { PromptManager } = require('./prompt-manager');
 const targetLanguageDetector = require('../../utils/target_language_detector');
+const { appConfig } = require('../../utils/app_config');
 
 
 /**
@@ -332,11 +333,18 @@ class OllamaBackend {
                     headers['Content-Length'] = Buffer.byteLength(options.body);
                 }
 
+                const proxyConfig = appConfig.load().proxy || {};
+                const sslVerify = proxyConfig.sslVerify !== undefined ? !!proxyConfig.sslVerify : false;
+
                 const reqOptions = {
                     method: options.method || 'GET',
                     headers: headers,
                     signal: options.signal
                 };
+
+                if (protocol === https) {
+                    reqOptions.rejectUnauthorized = sslVerify;
+                }
 
                 const req = protocol.request(url, reqOptions, (res) => {
                     let dataArray = [];

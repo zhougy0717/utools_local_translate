@@ -4,6 +4,7 @@ const http = require('http');
 const https = require('https');
 const { LibreTranslateConfig } = require('./config');
 const targetLanguageDetector = require('../../utils/target_language_detector');
+const { appConfig } = require('../../utils/app_config');
 
 /**
  * LibreTranslate API 翻译后端驱动
@@ -121,11 +122,18 @@ class LibreTranslateBackend {
             const urlObj = new URL(url);
             const protocol = urlObj.protocol === 'https:' ? https : http;
             
+            const proxyConfig = appConfig.load().proxy || {};
+            const sslVerify = proxyConfig.sslVerify !== undefined ? !!proxyConfig.sslVerify : false;
+
             const reqOptions = {
                 method: options.method || 'GET',
                 headers: options.headers || {},
                 signal: options.signal
             };
+
+            if (protocol === https) {
+                reqOptions.rejectUnauthorized = sslVerify;
+            }
 
             const req = protocol.request(url, reqOptions, (res) => {
                 let data = '';
