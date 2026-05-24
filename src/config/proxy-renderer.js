@@ -10,14 +10,18 @@ const dom = {
     testUrl: document.getElementById('proxy-test-url'),
     btnTest: document.getElementById('btn-test'),
     btnSave: document.getElementById('btn-save'),
+    btnBack: document.getElementById('btn-back'),
     resultMessage: document.getElementById('result-message'),
     proxyFields: document.getElementById('proxy-fields'),
     authFields: document.getElementById('auth-fields'),
     sslVerify: document.getElementById('proxy-ssl-verify')
 };
 
+// 表单 Dirty 状态追踪（任意字段修改后标记为 true，保存成功后重置）
+let isDirty = false;
+
 /**
- * 加载当前配置
+ * 加载当前配置，并根据来源面板 ID 决定是否显示返回按钮
  */
 async function loadConfig() {
     try {
@@ -32,6 +36,12 @@ async function loadConfig() {
         dom.testUrl.value = config.testUrl || 'https://www.google.com';
         
         toggleAuthFields();
+
+        // 查询来源面板 ID，非 null 时显示返回按钮
+        const fromPanelId = _proxyAPI.getFromPanelId ? _proxyAPI.getFromPanelId() : null;
+        if (fromPanelId && dom.btnBack) {
+            dom.btnBack.style.display = '';
+        }
     } catch (e) {
         showResult('读取配置失败: ' + e.message, 'error');
     }
@@ -110,6 +120,8 @@ async function performSave() {
     try {
         const { password, ...config } = data;
         await _proxyAPI.saveProxyConfig(config, password);
+        // 保存成功后重置 dirty 状态
+        isDirty = false;
         return true;
     } catch (e) {
         showResult('保存失败: ' + e.message, 'error');
@@ -117,9 +129,60 @@ async function performSave() {
     }
 }
 
-// 绑定事件
+// ─── Dirty 状态追踪：监听所有表单元素变动 ────────────────────────────────────
+const watchedInputs = [dom.type, dom.host, dom.port, dom.username, dom.password, dom.testUrl];
+watchedInputs.forEach(el => {
+    if (!el) return;
+    el.addEventListener('input', () => { isDirty = true; });
+});
+[dom.authEnabled, dom.sslVerify].forEach(el => {
+    if (!el) return;
+    el.addEventListener('change', () => { isDirty = true; });
+});
+
+// ─── 认证字段切换 ─────────────────────────────────────────────────────────────
 dom.authEnabled.addEventListener('change', toggleAuthFields);
 
+// ─── 返回按钮逻辑 ─────────────────────────────────────────────────────────────
+if (dom.btnBack) {
+    dom.btnBack.addEventListener('click', async () => {
+        if (!isDirty) {
+            // 表单未修改，直接返回
+            _proxyAPI.goBack();
+            return;
+        }
+
+        // 表单已修改，弹出 uTools 原生确认对话框
+        const utools = window.parent && window.parent.utools ? window.parent.utools : (typeof window.utools !== 'undefined' ? window.utools : null);
+        if (!utools) {
+            // 降级：没有 utools API 时直接返回（测试环境）
+            _proxyAPI.goBack();
+            return;
+        }
+
+        const choice = await utools.showMessageBox({
+            type: 'question',
+            title: '未保存的更改',
+            message: '你有未保存的修改，是否要保存后返回？',
+            buttons: ['保存并返回', '直接返回 (丢弃修改)', '取消']
+        });
+
+        if (choice === 0) {
+            // 保存并返回
+            const saved = await performSave();
+            if (saved) {
+                _proxyAPI.goBack();
+            }
+            // 保存失败则留在当前页（performSave 已显示错误消息）
+        } else if (choice === 1) {
+            // 直接返回（丢弃修改）
+            _proxyAPI.goBack();
+        }
+        // choice === 2：取消，停留在当前页
+    });
+}
+
+// ─── 测试连通性按钮 ───────────────────────────────────────────────────────────
 dom.btnTest.addEventListener('click', async () => {
     // 1. 先执行保存逻辑 (尊重用户显式行为：测试即认可当前输入有效)
     const saved = await performSave();
@@ -137,7 +200,7 @@ dom.btnTest.addEventListener('click', async () => {
         if (result.success) {
             showResult(`配置已保存，测试成功！响应时间: ${result.time}ms`, 'success');
         } else {
-            // 注意：连接失败依然保留“配置已保存”的提示文字
+            // 注意：连接失败依然保留"配置已保存"的提示文字
             showResult(`配置已保存，但连接测试未通过: ${result.error}`, 'error');
         }
     } catch (e) {
@@ -148,6 +211,7 @@ dom.btnTest.addEventListener('click', async () => {
     }
 });
 
+// ─── 保存按钮 ─────────────────────────────────────────────────────────────────
 dom.btnSave.addEventListener('click', async () => {
     const saved = await performSave();
     if (saved) {
@@ -155,7 +219,7 @@ dom.btnSave.addEventListener('click', async () => {
     }
 });
 
-// 绑定 Esc 键退出
+// ─── Esc 键退出 ───────────────────────────────────────────────────────────────
 window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         _proxyAPI.closePanel();

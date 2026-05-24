@@ -30,7 +30,7 @@ describe('LibreTranslateBackend Unified Config', () => {
 
         nock('http://127.0.0.1:5000')
             .post('/translate', body => {
-                // Should use 'en' and 'zh' from constructor config
+                // Since detector detects 'test' as 'en' and targetOverride is null
                 assert.strictEqual(body.source, 'en');
                 assert.strictEqual(body.target, 'zh');
                 return true;
@@ -38,8 +38,8 @@ describe('LibreTranslateBackend Unified Config', () => {
             .reply(200, mockResponse);
 
         const result = await new Promise((resolve) => {
-            // Passing null/undefined for languages
-            backend.queryWord('test', null, null, (err, res) => resolve(res));
+            // Passing targetOverride as null (falls back to default/detected)
+            backend.queryWord('test', null, (err, res) => resolve(res));
         });
         assert.strictEqual(result.found, true);
     });
@@ -47,14 +47,14 @@ describe('LibreTranslateBackend Unified Config', () => {
     it('should prioritize passed parameters over config defaults', async () => {
         nock('http://127.0.0.1:5000')
             .post('/translate', body => {
-                assert.strictEqual(body.source, 'fr');
-                assert.strictEqual(body.target, 'de');
+                assert.strictEqual(body.source, 'en'); // 'test' detected as 'en'
+                assert.strictEqual(body.target, 'de'); // targetOverride is 'de'
                 return true;
             })
             .reply(200, { translatedText: 'french to german' });
 
         await new Promise((resolve) => {
-            backend.queryWord('test', 'fr', 'de', (err, res) => resolve(res));
+            backend.queryWord('test', 'de', (err, res) => resolve(res));
         });
     });
 
@@ -64,7 +64,7 @@ describe('LibreTranslateBackend Unified Config', () => {
             .reply(403, 'Forbidden');
 
         const result = await new Promise((resolve) => {
-            backend.queryWord('test', 'en', 'zh', (err, res) => resolve(res));
+            backend.queryWord('test', 'zh', (err, res) => resolve(res));
         });
         assert.strictEqual(result.found, false);
         assert.ok(result.message.includes('API Key 无效'));
@@ -73,10 +73,10 @@ describe('LibreTranslateBackend Unified Config', () => {
     it('should handle connection refused gracefully', async () => {
         nock('http://127.0.0.1:5000')
             .post('/translate')
-            .replyWithError({ message: 'ECONNREFUSED', code: 'ECONNREFUSED' });
+            .replyWithError(new Error('ECONNREFUSED'));
 
         const result = await new Promise((resolve) => {
-            backend.queryWord('test', 'en', 'zh', (err, res) => resolve(res));
+            backend.queryWord('test', 'zh', (err, res) => resolve(res));
         });
         assert.strictEqual(result.found, false);
         assert.ok(result.message.includes('无法连接到 LibreTranslate 服务'));

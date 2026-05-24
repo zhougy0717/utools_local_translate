@@ -481,11 +481,11 @@ class OllamaBackend {
             },
             // 关闭面板
             closePanel: () => this.closePanel(),
-            // 打开全局代理设置
+            // 打开全局代理设置（来源为 'ollama'，代理页面将据此显示返回按钮）
             openGlobalProxyConfig: () => {
                 const { coreService } = require('../../core/core_service');
                 const proxyService = coreService.getProxyService();
-                if (proxyService) proxyService.openPanel();
+                if (proxyService) proxyService.openPanel('ollama');
             }
         };
 

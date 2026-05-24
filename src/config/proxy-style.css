@@ -45,15 +45,53 @@ body {
   flex-direction: column;
 }
 
-h1 {
-  font-size: 1.25rem;
-  font-weight: 700;
+/* 页眉：返回按钮 + 标题 */
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+#btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  width: auto;
+  flex-shrink: 0;
+}
+
+#btn-back:hover {
+  background: #f1f5f9;
+  color: var(--text-primary);
+  border-color: var(--primary-color);
+}
+
+h1, .header-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  flex-shrink: 0;
+}
+
+.header-left {
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--text-primary);
-  flex-shrink: 0;
 }
 
 .form-group {

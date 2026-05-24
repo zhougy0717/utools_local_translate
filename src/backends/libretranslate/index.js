@@ -231,6 +231,12 @@ class LibreTranslateBackend {
             closePanel: () => {
                 this.closePanel();
                 if (onCloseCallback) onCloseCallback();
+            },
+            // 打开全局代理设置（来源为 'libretranslate'，代理页面将据此显示返回按钮）
+            openProxyConfig: () => {
+                const { coreService } = require('../../core/core_service');
+                const proxyService = coreService.getProxyService();
+                if (proxyService) proxyService.openPanel('libretranslate');
             }
         };
 

@@ -111,11 +111,8 @@
 
     $('btn-config-proxy').onclick = (e) => {
         e.preventDefault();
-        // 如果有全局配置代理的方法，可以调用
-        if (typeof utools !== 'undefined') {
-            // 这里假设通过 coreService 触发，或由后端自行处理
-            // 为简单起见，提示用户退出配置去全局设置
-            showMessage(true, '请在插件设置中配置全局代理');
+        if (window._libreAPI && typeof window._libreAPI.openProxyConfig === 'function') {
+            window._libreAPI.openProxyConfig();
         }
     };
 

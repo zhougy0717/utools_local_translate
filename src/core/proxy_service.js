@@ -17,6 +17,7 @@ class ProxyService extends EventEmitter {
     super();
     this.core = core;
     this._fetch = null;
+    this._fromPanelId = null;
     
     // 定义常量
     this.EVENT_PROXY_CONFIG_CHANGED = 'PROX_CONFIG_CHANGED';
@@ -142,9 +143,12 @@ class ProxyService extends EventEmitter {
 
   /**
    * 打开配置面板 (UI 自治实现)
-   * 原逻辑从 preload.js 迁移至此，确保 preload.js 保持极简
+   * @param {string|null} fromPanelId - 来源面板 ID ('ollama'/'libretranslate'/'dict'/null)
    */
-  openPanel() {
+  openPanel(fromPanelId = null) {
+    // 记录来源面板 ID，用于返回导航
+    this._fromPanelId = fromPanelId || null;
+
     if (typeof utools !== 'undefined') {
       utools.setExpendHeight(600);
     }
@@ -184,6 +188,46 @@ class ProxyService extends EventEmitter {
   }
 
   /**
+   * 获取来源面板 ID（供代理配置 iframe 查询，决定是否显示返回按钮）
+   * @returns {string|null}
+   */
+  getFromPanelId() {
+    return this._fromPanelId;
+  }
+
+  /**
+   * 返回来源面板（销毁代理面板，广播配置变更，重新打开来源后端配置页）
+   * 方案 A（彻底销毁，返回重绘）：与 spec-00045 § 5.1 保持一致
+   */
+  goBack() {
+    const fromPanelId = this._fromPanelId;
+    // 1. 清除来源记录
+    this._fromPanelId = null;
+    // 2. 销毁代理面板 DOM
+    this._removeExistingPanel();
+    // 3. 广播配置变更（通知 BackendManager 同步代理设置）
+    this.emit(this.EVENT_PROXY_CONFIG_CHANGED);
+    // 4. 恢复来源面板（延迟 require 避免循环依赖）
+    if (fromPanelId) {
+      try {
+        const BackendManager = require('./backend_manager');
+        if (fromPanelId === 'ollama') {
+          const ollamaBackend = BackendManager._getOllamaBackend ? BackendManager._getOllamaBackend() : null;
+          if (ollamaBackend && typeof ollamaBackend.openConfigPanel === 'function') {
+            ollamaBackend.openConfigPanel(() => {});
+          } else {
+            BackendManager.openConfigPanel(() => {});
+          }
+        } else {
+          BackendManager.openConfigPanel(() => {});
+        }
+      } catch (e) {
+        console.error('[ProxyService] goBack: failed to reopen source panel:', e);
+      }
+    }
+  }
+
+  /**
    * 内部私有方法：清理残留 DOM
    */
   _removeExistingPanel() {
@@ -198,6 +242,9 @@ class ProxyService extends EventEmitter {
    * 接口映射: UI 进程调用
    */
   closePanel() {
+    // 完全关闭时清除来源记录
+    this._fromPanelId = null;
+
     this._removeExistingPanel();
     
     if (typeof utools !== 'undefined') {

@@ -1,3 +1,4 @@
 {
-    "plantuml.java": "C:\\Program Files\\Microsoft\\jdk-17.0.18.8-hotspot\\bin\\java.exe"
+    "plantuml.java": "C:\\Program Files\\Microsoft\\jdk-17.0.18.8-hotspot\\bin\\java.exe",
+    "git.ignoreLimitWarning": true
 }

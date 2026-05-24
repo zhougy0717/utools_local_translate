@@ -322,7 +322,7 @@ function createDictBackend(options) {
         const { coreService } = require('../../core/core_service');
         const proxyService = coreService.getProxyService();
         if (proxyService && typeof proxyService.openPanel === 'function') {
-            proxyService.openPanel();
+            proxyService.openPanel('dict');
         } else {
             console.error('[DictBackend] ProxyService.openPanel not available');
         }

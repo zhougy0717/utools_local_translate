@@ -39,18 +39,35 @@
       flex-direction: column;
     }
 
-    h3 {
-      margin-top: 0;
+    .page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-shrink: 0;
+      height: 38px;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
       color: var(--text-main);
-      font-size: 20px;
-      font-weight: 600;
-      margin-bottom: 8px;
+      margin: 0;
     }
 
     .subtitle {
       color: var(--text-secondary);
-      font-size: 14px;
-      margin-bottom: 24px;
+      font-size: 13px;
+      margin-bottom: 0;
     }
 
     .form-group {
@@ -308,8 +325,15 @@
 <body>
 
 <div class="card">
-  <h3>离线词典配置</h3>
-  <div class="subtitle">请选择下载源和数据存储目录</div>
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="feather feather-book"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+        <span>离线词典配置</span>
+      </div>
+    </div>
+    <div class="subtitle">请选择下载源和数据存储目录</div>
+  </div>
 
   <div id="errorMessage"></div>
 
