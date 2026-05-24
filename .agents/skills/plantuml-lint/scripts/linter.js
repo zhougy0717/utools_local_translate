@@ -206,6 +206,20 @@ function lintFile(filePath) {
     }
 }
 
+// Cleanup: kill any residual java plantuml -syntax processes on exit.
+// This is a safety net in case spawnSync's killSignal doesn't fully work.
+process.on('exit', () => {
+    try {
+        const { spawnSync: _spawnSync } = require('child_process');
+        _spawnSync('pkill', ['-f', 'java.*plantuml.*-syntax'], {
+            stdio: 'ignore',
+            timeout: 2000
+        });
+    } catch (_) {
+        // Best effort cleanup — ignore errors
+    }
+});
+
 // CLI entry point
 const args = process.argv.slice(2);
 if (args.length > 0) {

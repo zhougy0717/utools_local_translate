@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { spawnSync } = require('child_process');
 const crypto = require('crypto');
 
 /**
  * Validate PlantUML content using plantuml.jar -syntax check.
+ * Uses spawnSync with SIGKILL to guarantee child process cleanup on timeout.
  * @param {string} content - The PlantUML source code
  * @param {object} config - Config object with plantuml_jar_path, java_executable
  * @returns {{ok: boolean, errors: Array<{line: number, message: string}>}}
@@ -17,24 +18,36 @@ function validateWithJar(content, config) {
     try {
         fs.writeFileSync(tmpFile, content, 'utf8');
 
-        const cmd = `"${config.java_executable}" -jar "${config.plantuml_jar_path}" -syntax "${tmpFile}"`;
-        let stdout;
-        try {
-            stdout = execSync(cmd, {
-                encoding: 'utf8',
-                timeout: 30000,
-                stdio: ['pipe', 'pipe', 'pipe']
-            });
-        } catch (e) {
-            stdout = e.stdout || e.stderr || '';
-        }
+        const javaExe = config.java_executable || 'java';
+        const jarPath = config.plantuml_jar_path;
+
+        // Use spawnSync instead of execSync to guarantee child process cleanup.
+        // Key: killSignal 'SIGKILL' ensures the java process is forcefully terminated
+        // on timeout, preventing zombie processes.
+        // -Djava.awt.headless=true skips font subsystem initialization that causes
+        // hangs with CJK characters on some systems.
+        const result = spawnSync(javaExe, [
+            '-Djava.awt.headless=true',
+            '-Dfile.encoding=UTF-8',
+            '-jar', jarPath,
+            '-syntax', tmpFile
+        ], {
+            encoding: 'utf8',
+            timeout: 15000,
+            killSignal: 'SIGKILL',
+            stdio: ['pipe', 'pipe', 'pipe']
+        });
+
+        const stdout = result.stdout || '';
+        const stderr = result.stderr || '';
+        const output = stdout + stderr;
 
         // Parse Error line (X) patterns
         const errorRegex = /Error\s+line\s+\((\d+)\)\s*[:\-]?\s*(.*)?/gi;
         const errors = [];
         let match;
 
-        while ((match = errorRegex.exec(stdout)) !== null) {
+        while ((match = errorRegex.exec(output)) !== null) {
             errors.push({
                 line: parseInt(match[1], 10),
                 message: (match[2] || 'Syntax error').trim()

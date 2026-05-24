@@ -21,6 +21,10 @@ description: 自动修复 Markdown 文件中内嵌 PlantUML 代码块的语法�
 - **声明补全**：缺失的 `@startuml` / `@enduml` 自动补全
 - **引号修复**：未闭合的双引号 `"` 自动闭合
 - **箭头语法**：全角/Unicode 箭头（如 `–>`、`→`）标准化为 ASCII（`->`）
+- **字体声明规范化**：逗号分隔的多字体回退列表（如 `"Inter", "sans-serif"`）截断为单字体
+- **活动图 skinparam 清理**：移除活动图中无效的 `skinparam interfaceStyle rectangle`
+- **分区语法标准化**：将 `end partition` 转换为大括号 `{ }` 语法（兼容旧版引擎）
+- **浮动注释降级**：将 `floating note` 转换为标准 `note`（兼容旧版引擎）
 - **块结束符**：缺失的 `endif`/`endwhile`/`endloop` 等关键字自动补全
 - **参与者声明**：未定义的 participant/entity 自动添加声明
 - **字符清理**：非法控制字符自动移除
@@ -170,7 +174,7 @@ plantuml-lint/
 ├── scripts/
 │   ├── linter.js         ← 主入口 (CLI + 核心编排)
 │   ├── jar_validator.js  ← Jar Pass 校验与启发式修复引擎
-│   └── regex_rules.js    ← Regex 规则集 (5条规则)
+│   └── regex_rules.js    ← Regex 规则集 (9条规则)
 ├── docs/
 │   └── PLAN.md           ← 开发计划
 └── test.md               ← 测试用例
