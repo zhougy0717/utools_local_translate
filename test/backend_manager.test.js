@@ -112,7 +112,7 @@ describe('BackendManager', () => {
   describe('queryWord', () => {
     it('should throw error if backend is not initialized', () => {
       let calledArg = null;
-      BackendManager.queryWord('test', 'en', 'zh', (err) => { calledArg = err; }, null);
+      BackendManager.queryWord('test', 'zh', (err) => { calledArg = err; }, null);
       assert.strictEqual(calledArg.message, 'Backend not initialized');
 
     });
@@ -123,7 +123,7 @@ describe('BackendManager', () => {
       let wasCalled = false;
       BackendManager.activeBackend.queryWord = () => { wasCalled = true; };
       
-      BackendManager.queryWord('test', 'en', 'zh', () => {}, () => {});
+      BackendManager.queryWord('test', 'zh', () => {}, () => {});
       
       assert.strictEqual(wasCalled, true);
 

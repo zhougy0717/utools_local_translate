@@ -3,7 +3,7 @@
  * 使用 Node 内置 node:test 框架，调用 backends/dict 进行测试。
  * 使用 resources 目录，已知词用例以 "nite" 为例。
  */
-const { describe, it } = require('node:test');
+const { describe, it, after } = require('node:test');
 const assert = require('node:assert');
 const path = require('path');
 const fs = require('fs');
@@ -12,9 +12,9 @@ const { createDictBackend } = require('../src/backends/dict/index.js');
 const resourcesDir = path.join(__dirname, '..', 'resources');
 const backend = createDictBackend({ dictRepoPath: resourcesDir });
 
-function queryWordPromise(backend, word, sourceLang, targetLang) {
+function queryWordPromise(backend, word, targetOverride) {
   return new Promise((resolve, reject) => {
-    backend.queryWord(word, sourceLang || 'en', targetLang || 'zh', (err, result) => {
+    backend.queryWord(word, targetOverride || 'zh', (err, result) => {
       if (err) return reject(err);
       resolve(result);
     });
@@ -22,9 +22,15 @@ function queryWordPromise(backend, word, sourceLang, targetLang) {
 }
 
 describe('ecdict 从 SQLite 查词', function () {
+  after(() => {
+    if (backend && typeof backend.stopWorker === 'function') {
+      backend.stopWorker();
+    }
+  });
+
   it('未配置 dictRepoPath 时拦截并提示', async function () {
     const emptyBackend = createDictBackend({});
-    const result = await queryWordPromise(emptyBackend, 'nite', 'en', 'zh');
+    const result = await queryWordPromise(emptyBackend, 'nite', 'zh');
     assert.strictEqual(result.found, false, '未配置时应该返回 found: false');
     assert.ok(result.message.includes('请配置词典绝对路径'), '应该提示配置路径');
   });
@@ -33,7 +39,7 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(resourcesDir, 'ecdict.db');
     if (!fs.existsSync(dbPath)) return this.skip();
 
-    const result = await queryWordPromise(backend, 'nite', 'en', 'zh');
+    const result = await queryWordPromise(backend, 'nite', 'zh');
     assert.strictEqual(result.found, true, 'nite 应能查到');
     assert.ok(typeof result.translation === 'string', '应有 translation');
   });
@@ -42,7 +48,7 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(resourcesDir, 'ecdict.db');
     if (!fs.existsSync(dbPath)) return this.skip();
 
-    const result = await queryWordPromise(backend, 'xyznonexistent123', 'en', 'zh');
+    const result = await queryWordPromise(backend, 'xyznonexistent123', 'zh');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, false, '不存在的词应返回 found: false');
   });
@@ -51,8 +57,8 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(resourcesDir, 'ecdict.db');
     if (!fs.existsSync(dbPath)) return this.skip();
 
-    const r1 = await queryWordPromise(backend, 'Nite', 'en', 'zh');
-    const r2 = await queryWordPromise(backend, 'nite', 'en', 'zh');
+    const r1 = await queryWordPromise(backend, 'Nite', 'zh');
+    const r2 = await queryWordPromise(backend, 'nite', 'zh');
     assert.strictEqual(r1.found, true, 'Nite 应能查到');
     assert.strictEqual(r2.found, true, 'nite 应能查到');
     assert.strictEqual(r1.translation, r2.translation, '大小写不同应得到相同释义');
@@ -61,7 +67,7 @@ describe('ecdict 从 SQLite 查词', function () {
   it('词库不存在时返回 found: false 或 message 提示', async function () {
     const notExistPath = path.join(__dirname, '..', 'resources', 'nonexist_dir_123');
     const backendNoDb = createDictBackend({ dictRepoPath: notExistPath });
-    const result = await queryWordPromise(backendNoDb, 'nite', 'en', 'zh');
+    const result = await queryWordPromise(backendNoDb, 'nite', 'zh');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, false, '词库不存在时应 found: false');
     if (result.message) {
@@ -73,7 +79,7 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(resourcesDir, 'cccedict.db');
     if (!fs.existsSync(dbPath)) return this.skip();
 
-    const result = await queryWordPromise(backend, '中国', 'zh', 'en');
+    const result = await queryWordPromise(backend, '中国', 'en');
     assert.strictEqual(result.found, true, '中国 应能查到');
     assert.ok(typeof result.translation === 'string', '应有 translation');
   });
@@ -82,7 +88,7 @@ describe('ecdict 从 SQLite 查词', function () {
     const dbPath = path.join(resourcesDir, 'cccedict.db');
     if (!fs.existsSync(dbPath)) return this.skip();
 
-    const result = await queryWordPromise(backend, '不存在词条xyz', 'zh', 'en');
+    const result = await queryWordPromise(backend, '不存在词条xyz', 'en');
     assert.ok(result, '应返回结果对象');
     assert.strictEqual(result.found, false, '不存在的词应返回 found: false');
   });

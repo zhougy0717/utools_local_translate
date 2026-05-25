@@ -87,7 +87,11 @@ class DictDownloader {
           const { SocksProxyAgent } = require('socks-proxy-agent');
           this.agent = new SocksProxyAgent(this.proxy);
         } else {
-          this.agent = new HttpsProxyAgent(this.proxy, { rejectUnauthorized: !!this.sslVerify });
+          const { getSystemCerts } = require('../../utils/system_ca');
+          this.agent = new HttpsProxyAgent(this.proxy, { 
+            rejectUnauthorized: !!this.sslVerify,
+            ca: getSystemCerts()
+          });
         }
       } catch (e) {
         console.error('Failed to create proxy agent:', e);
@@ -192,6 +196,11 @@ class DictDownloader {
         },
         rejectUnauthorized: !!this.sslVerify
       };
+
+      if (urlObj.protocol === 'https:') {
+        const { getSystemCerts } = require('../../utils/system_ca');
+        requestOptions.ca = getSystemCerts();
+      }
 
       // 如果有已下载的部分，添加 Range 头
       if (startPosition > 0) {

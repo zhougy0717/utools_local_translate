@@ -132,7 +132,9 @@ class LibreTranslateBackend {
             };
 
             if (protocol === https) {
+                const { getSystemCerts } = require('../../utils/system_ca');
                 reqOptions.rejectUnauthorized = sslVerify;
+                reqOptions.ca = getSystemCerts();
             }
 
             const req = protocol.request(url, reqOptions, (res) => {
