@@ -6,6 +6,7 @@
     const sourceLangSelect = $('sourceLang');
     const targetLangSelect = $('targetLang');
     const useProxyCheckbox = $('useProxy');
+    const sslVerifyCheckbox = $('sslVerify');
     const proxyLabel = $('proxy-label');
     const btnSave = $('btn-save');
     const btnRefreshLangs = $('btn-refresh-langs');
@@ -94,6 +95,7 @@
         sourceLangSelect.value = config.sourceLang || 'auto';
         targetLangSelect.value = config.targetLang || 'zh';
         useProxyCheckbox.checked = !!config.useProxy;
+        sslVerifyCheckbox.checked = config.sslVerify === false;
         updateProxyLabel(!!config.useProxy);
 
         // 自动尝试一次健康检查
@@ -123,7 +125,8 @@
             apiKey: apiKeyInput.value.trim(),
             sourceLang: sourceLangSelect.value,
             targetLang: targetLangSelect.value,
-            useProxy: useProxyCheckbox.checked
+            useProxy: useProxyCheckbox.checked,
+            sslVerify: !sslVerifyCheckbox.checked
         };
 
         const result = window._libreAPI.saveConfig(config);

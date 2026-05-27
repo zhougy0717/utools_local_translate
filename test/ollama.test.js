@@ -91,4 +91,54 @@ describe('OllamaBackend', () => {
             done();
         });
     });
+
+    it('should respect sslVerify settings in request options', async () => {
+        const https = require('https');
+        const originalRequest = https.request;
+        let capturedOptions = null;
+        https.request = (url, options, callback) => {
+            const opts = typeof url === 'string' || url instanceof URL ? options : url;
+            capturedOptions = opts;
+            return originalRequest(url, options, callback);
+        };
+
+        try {
+            // Case 1: sslVerify is false
+            const sslBackend = new OllamaBackend({
+                apiBase: 'https://127.0.0.1:11434/v1',
+                model: 'test-model',
+                sslVerify: false
+            });
+            
+            nock('https://127.0.0.1:11434')
+                .post('/v1/chat/completions')
+                .reply(200, { choices: [{ message: { content: 'test' } }] });
+
+            await new Promise((resolve) => {
+                sslBackend.queryWord('test', 'zh', resolve);
+            });
+
+            assert.ok(capturedOptions);
+            assert.strictEqual(capturedOptions.rejectUnauthorized, false);
+
+            // Case 2: sslVerify is true (default)
+            const sslDefaultBackend = new OllamaBackend({
+                apiBase: 'https://127.0.0.1:11434/v1',
+                model: 'test-model'
+            });
+
+            nock('https://127.0.0.1:11434')
+                .post('/v1/chat/completions')
+                .reply(200, { choices: [{ message: { content: 'test' } }] });
+
+            await new Promise((resolve) => {
+                sslDefaultBackend.queryWord('test', 'zh', resolve);
+            });
+
+            assert.ok(capturedOptions);
+            assert.strictEqual(capturedOptions.rejectUnauthorized, true);
+        } finally {
+            https.request = originalRequest;
+        }
+    });
 });

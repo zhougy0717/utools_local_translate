@@ -8,6 +8,7 @@ const Bridge = window.parent._ollamaAPI;
 const UI = {
     apiBase: document.getElementById('apiBase'),
     apiKey: document.getElementById('apiKey'),
+    sslVerify: document.getElementById('sslVerify'),
     modelSelect: document.getElementById('model-select'),
     visionModelSelect: document.getElementById('vision-model-select'),
     btnRefreshModels: document.getElementById('btn-refresh-models'),
@@ -100,6 +101,7 @@ async function init() {
     UI.apiKey.value = config.apiKey || '';
     UI.prompt.value = config.prompt || '';
     UI.proxyToggle.checked = config.useProxy || false;
+    UI.sslVerify.checked = config.sslVerify === false;
 
     // 填充模型列表并初始化位置
     populateModels(config.models || [], config.model, config.visionModel);
@@ -135,6 +137,7 @@ function handleSave(shouldClose = false) {
         visionModel: UI.visionModelSelect.value,
         prompt: UI.prompt.value.trim(),
         useProxy: UI.proxyToggle.checked,
+        sslVerify: !UI.sslVerify.checked,
         models: Array.from(UI.modelSelect.options).map(opt => opt.value).filter(v => v)
     };
 
@@ -183,7 +186,7 @@ async function handleRefreshModels(silent = false) {
 }
 
 // 事件绑定：即时保存
-const inputIds = ['apiBase', 'apiKey', 'model-select', 'vision-model-select', 'prompt', 'proxy-toggle'];
+const inputIds = ['apiBase', 'apiKey', 'model-select', 'vision-model-select', 'prompt', 'proxy-toggle', 'sslVerify'];
 inputIds.forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;

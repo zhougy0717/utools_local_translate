@@ -8,7 +8,8 @@ const LIBRETRANSLATE_DEFAULTS = {
   apiBase: 'http://127.0.0.1:5000',
   apiKey: '',
   sourceLang: 'auto',
-  targetLang: 'zh'
+  targetLang: 'zh',
+  sslVerify: true
 };
 
 class LibreTranslateConfig extends AbstractBackendConfig {

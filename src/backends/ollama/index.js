@@ -333,8 +333,7 @@ class OllamaBackend {
                     headers['Content-Length'] = Buffer.byteLength(options.body);
                 }
 
-                const proxyConfig = appConfig.load().proxy || {};
-                const sslVerify = proxyConfig.sslVerify !== undefined ? !!proxyConfig.sslVerify : false;
+                const sslVerify = this.config.sslVerify !== undefined ? !!this.config.sslVerify : true;
 
                 const reqOptions = {
                     method: options.method || 'GET',

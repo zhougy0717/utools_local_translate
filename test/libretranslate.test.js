@@ -81,4 +81,54 @@ describe('LibreTranslateBackend Unified Config', () => {
         assert.strictEqual(result.found, false);
         assert.ok(result.message.includes('无法连接到 LibreTranslate 服务'));
     });
+
+    it('should respect sslVerify settings in request options', async () => {
+        const https = require('https');
+        const originalRequest = https.request;
+        let capturedOptions = null;
+        https.request = (url, options, callback) => {
+            const opts = typeof url === 'string' || url instanceof URL ? options : url;
+            capturedOptions = opts;
+            return originalRequest(url, options, callback);
+        };
+
+        try {
+            // Case 1: sslVerify is false
+            const sslBackend = new LibreTranslateBackend({
+                apiBase: 'https://127.0.0.1:5000',
+                apiKey: 'test-key',
+                sslVerify: false
+            });
+
+            nock('https://127.0.0.1:5000')
+                .post('/translate')
+                .reply(200, { translatedText: 'test' });
+
+            await new Promise((resolve) => {
+                sslBackend.queryWord('test', 'zh', resolve);
+            });
+
+            assert.ok(capturedOptions);
+            assert.strictEqual(capturedOptions.rejectUnauthorized, false);
+
+            // Case 2: sslVerify is true (default)
+            const sslDefaultBackend = new LibreTranslateBackend({
+                apiBase: 'https://127.0.0.1:5000',
+                apiKey: 'test-key'
+            });
+
+            nock('https://127.0.0.1:5000')
+                .post('/translate')
+                .reply(200, { translatedText: 'test' });
+
+            await new Promise((resolve) => {
+                sslDefaultBackend.queryWord('test', 'zh', resolve);
+            });
+
+            assert.ok(capturedOptions);
+            assert.strictEqual(capturedOptions.rejectUnauthorized, true);
+        } finally {
+            https.request = originalRequest;
+        }
+    });
 });

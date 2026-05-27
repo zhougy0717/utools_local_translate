@@ -122,8 +122,7 @@ class LibreTranslateBackend {
             const urlObj = new URL(url);
             const protocol = urlObj.protocol === 'https:' ? https : http;
             
-            const proxyConfig = appConfig.load().proxy || {};
-            const sslVerify = proxyConfig.sslVerify !== undefined ? !!proxyConfig.sslVerify : false;
+            const sslVerify = this.config.sslVerify !== undefined ? !!this.config.sslVerify : true;
 
             const reqOptions = {
                 method: options.method || 'GET',
@@ -178,6 +177,15 @@ class LibreTranslateBackend {
     openConfigPanel(onCloseCallback) {
         if (typeof utools === 'undefined') return;
 
+        const containerId = 'libretranslate-config-container';
+        const existing = document.getElementById(containerId);
+        if (existing) {
+            existing.style.display = 'block';
+            this.configContainer = existing;
+            utools.setExpendHeight(540);
+            return;
+        }
+
         const configPath = path.join(__dirname, 'libretranslate-config.html');
         let htmlContent = fs.readFileSync(configPath, 'utf8');
 
@@ -188,11 +196,6 @@ class LibreTranslateBackend {
 
         // 设置面板并注入桥接 API
         utools.setExpendHeight(540);
-        const containerId = 'libretranslate-config-container';
-        
-        // 确保清理旧容器
-        const old = document.getElementById(containerId);
-        if (old) old.remove();
 
         const container = document.createElement('div');
         container.id = containerId;
